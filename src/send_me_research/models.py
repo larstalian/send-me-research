@@ -83,6 +83,7 @@ class RenderedDigest:
 
 @dataclass
 class DigestRunResult:
+    profile_name: str
     digest_date: date
     entries: List[DigestEntry]
     output_dir: str

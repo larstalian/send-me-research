@@ -12,6 +12,7 @@ from typing import Callable, Dict, List, Optional
 import httpx
 from pypdf import PdfReader
 
+from .config import AudienceProfile
 from .models import DigestEntry, PaperRecord
 from .normalize import build_paper_record, section_from_hints, title_hash
 
@@ -49,6 +50,7 @@ class CodexRanker:
         target_date: date,
         timezone_name: str,
         top_n: int,
+        audience_profile: AudienceProfile,
     ) -> List[DigestEntry]:
         if not candidates:
             return []
@@ -89,7 +91,13 @@ class CodexRanker:
             "additionalProperties": False,
         }
 
-        prompt = self._build_prompt(candidates, target_date=target_date, timezone_name=timezone_name, top_n=top_n)
+        prompt = self._build_prompt(
+            candidates,
+            target_date=target_date,
+            timezone_name=timezone_name,
+            top_n=top_n,
+            audience_profile=audience_profile,
+        )
         by_id = {paper.canonical_id: paper for paper in candidates}
         payload = self._run_schema_prompt(prompt=prompt, schema=schema, temp_prefix="codex-rank-")
 
@@ -128,6 +136,7 @@ class CodexRanker:
         timezone_name: str,
         max_candidates: int,
         existing_candidates: List[PaperRecord],
+        audience_profile: AudienceProfile,
     ) -> List[PaperRecord]:
         if max_candidates <= 0:
             return []
@@ -174,6 +183,7 @@ class CodexRanker:
             timezone_name=timezone_name,
             max_candidates=max_candidates,
             existing_candidates=existing_candidates,
+            audience_profile=audience_profile,
         )
         payload = self._run_schema_prompt(prompt=prompt, schema=schema, temp_prefix="codex-discover-")
         discoveries = payload.get("discoveries", [])
@@ -205,14 +215,24 @@ class CodexRanker:
             output.append(paper)
         return output
 
-    def _build_prompt(self, candidates: List[PaperRecord], *, target_date: date, timezone_name: str, top_n: int) -> str:
+    def _build_prompt(
+        self,
+        candidates: List[PaperRecord],
+        *,
+        target_date: date,
+        timezone_name: str,
+        top_n: int,
+        audience_profile: AudienceProfile,
+    ) -> str:
+        priority_line = ", ".join(audience_profile.priority_keywords[:10]) or "general ML relevance"
         lines = [
             "You are curating a daily research digest.",
             f"Digest date: {target_date.isoformat()}",
             f"Timezone: {timezone_name}",
+            f"Audience profile: {audience_profile.name}",
             f"Return at most {top_n} kept papers.",
-            "The audience cares about ML related to LLMs, agents, robotics, and cyber/security.",
-            "The audience especially values papers on post-training, fine-tuning, self-improvement, tool use, code generation, code benchmarks, and methods that improve agentic task performance.",
+            f"Audience description: {audience_profile.description}",
+            f"Priority topics: {priority_line}",
             "Prefer genuinely new, practical, benchmark, systems, attack/defense, and foundational papers over weak keyword matches.",
             "A focused but high-upside post-training or code-generation paper can outrank a noisier paper that merely mentions many trendy keywords.",
             "Use only these sections: LLMs, Agents, Robotics, Cyber, Other relevant.",
@@ -263,15 +283,18 @@ class CodexRanker:
         timezone_name: str,
         max_candidates: int,
         existing_candidates: List[PaperRecord],
+        audience_profile: AudienceProfile,
     ) -> str:
+        priority_line = ", ".join(audience_profile.priority_keywords[:10]) or "general ML relevance"
         lines = [
             "You are discovering additional papers for a daily research digest.",
             f"Digest date: {target_date.isoformat()}",
             f"Timezone: {timezone_name}",
+            f"Audience profile: {audience_profile.name}",
             f"Find at most {max_candidates} additional papers.",
             "Use web search to discover papers released on the digest date or the day before it.",
-            "The target topics are LLMs, agents, robotics, embodied AI, vision-language-action models, cyber/security, prompt injection, red teaming, tool use, evals, benchmarks, inference, and foundation-model systems.",
-            "Prioritize papers about post-training, fine-tuning, distillation, code generation, code benchmarks, and methods that improve agentic-task performance.",
+            f"Audience description: {audience_profile.description}",
+            f"Priority topics: {priority_line}",
             "Only return papers that look genuinely interesting and likely to matter to an ML/LLM/agents/cyber audience.",
             "Do not return anything that appears to already be in the existing candidate list.",
             "Prefer direct paper pages, DOI pages, arXiv pages, conference pages, or publisher pages.",

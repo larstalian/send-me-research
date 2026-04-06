@@ -21,21 +21,28 @@ class StateStore:
         for path in (self.papers_seen_path, self.digests_sent_path):
             path.touch(exist_ok=True)
 
-    def load_seen_ids(self) -> Set[str]:
+    def load_seen_ids(self, profile_name: str = "default") -> Set[str]:
         seen: Set[str] = set()
         for row in self._read_jsonl(self.papers_seen_path):
+            if self._row_profile(row) != profile_name:
+                continue
             for key in row.get("identifiers", []):
                 seen.add(str(key))
         return seen
 
-    def digest_already_sent(self, digest_date: str) -> bool:
-        return any(row.get("digest_date") == digest_date for row in self._read_jsonl(self.digests_sent_path))
+    def digest_already_sent(self, digest_date: str, profile_name: str = "default") -> bool:
+        return any(
+            row.get("digest_date") == digest_date and self._row_profile(row) == profile_name
+            for row in self._read_jsonl(self.digests_sent_path)
+        )
 
     def record_send(
         self,
         *,
         digest_date: str,
         subject: str,
+        profile_name: str,
+        output_dir: str,
         entries: Iterable[DigestEntry],
     ) -> None:
         entries = list(entries)
@@ -48,6 +55,7 @@ class StateStore:
                 self.papers_seen_path,
                 {
                     "sent_at": datetime.utcnow().isoformat() + "Z",
+                    "profile": profile_name,
                     "digest_date": digest_date,
                     "title": entry.paper.title,
                     "identifiers": list(dict.fromkeys([identifier for identifier in identifiers if identifier])),
@@ -58,9 +66,10 @@ class StateStore:
             self.digests_sent_path,
             {
                 "sent_at": datetime.utcnow().isoformat() + "Z",
+                "profile": profile_name,
                 "digest_date": digest_date,
                 "subject": subject,
-                "output_dir": f"out/digests/{digest_date}",
+                "output_dir": output_dir,
                 "paper_ids": [entry.paper.canonical_id for entry in entries],
             },
         )
@@ -108,3 +117,9 @@ class StateStore:
         if isinstance(raw, str):
             return date.fromisoformat(raw)
         raise ValueError(f"State row is missing digest_date: {row}")
+
+    def _row_profile(self, row: Dict[str, object]) -> str:
+        raw = row.get("profile")
+        if isinstance(raw, str) and raw.strip():
+            return raw
+        return "default"

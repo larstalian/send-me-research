@@ -108,6 +108,7 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          DIGEST_PROFILES_JSON: ${{ secrets.DIGEST_PROFILES_JSON }}
           DIGEST_TIMEZONE: America/Los_Angeles
         run: |
           if [[ "$SEND" == "true" ]]; then
@@ -124,6 +125,7 @@ jobs:
             -e SMTP_PORT \
             -e SMTP_USERNAME \
             -e SMTP_PASSWORD \
+            -e DIGEST_PROFILES_JSON \
             -e DIGEST_TIMEZONE \
             -v "$PWD:/workspace" \
             -v "$HOME/.codex:/home/app/.codex" \

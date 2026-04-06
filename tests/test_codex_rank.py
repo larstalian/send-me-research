@@ -3,6 +3,7 @@ import subprocess
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+from send_me_research.config import AppSettings
 from send_me_research.codex_rank import CodexRanker
 from send_me_research.normalize import build_paper_record
 
@@ -79,12 +80,14 @@ def test_codex_ranker_uses_schema_output() -> None:
         canonical_id="arxiv:9999.0001",
     )
     ranker = CodexRanker(runner=fake_runner)
+    profile = AppSettings.from_env(Path(__file__).resolve().parents[1]).default_profile()
 
     entries = ranker.rank(
         candidates=[record],
         target_date=date(2026, 3, 30),
         timezone_name="America/Los_Angeles",
         top_n=15,
+        audience_profile=profile,
     )
 
     assert len(entries) == 1
@@ -92,7 +95,13 @@ def test_codex_ranker_uses_schema_output() -> None:
     assert entries[0].section == "LLMs"
     assert entries[0].provenance == "Example Lab at Example University; arXiv preprint."
     assert entries[0].signal_score == 7.8
-    assert "profile_hints" in ranker._build_prompt([record], target_date=date(2026, 3, 30), timezone_name="America/Los_Angeles", top_n=15)
+    assert "profile_hints" in ranker._build_prompt(
+        [record],
+        target_date=date(2026, 3, 30),
+        timezone_name="America/Los_Angeles",
+        top_n=15,
+        audience_profile=profile,
+    )
 
 
 def test_codex_auth_check() -> None:
@@ -115,12 +124,14 @@ def test_codex_wildcard_discovery_returns_records() -> None:
         canonical_id="arxiv:existing",
     )
     ranker = CodexRanker(runner=fake_runner)
+    profile = AppSettings.from_env(Path(__file__).resolve().parents[1]).default_profile()
 
     discoveries = ranker.discover_wildcards(
         target_date=date(2026, 3, 30),
         timezone_name="America/Los_Angeles",
         max_candidates=5,
         existing_candidates=[existing],
+        audience_profile=profile,
     )
 
     assert len(discoveries) == 1

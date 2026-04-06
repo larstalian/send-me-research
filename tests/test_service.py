@@ -42,7 +42,7 @@ class FakeRanker:
     def auth_check(self):
         return "Logged in using ChatGPT"
 
-    def discover_wildcards(self, *, target_date, timezone_name, max_candidates, existing_candidates):
+    def discover_wildcards(self, *, target_date, timezone_name, max_candidates, existing_candidates, audience_profile):
         return [
             build_paper_record(
                 title="Discovered Cyber Paper",
@@ -59,7 +59,7 @@ class FakeRanker:
             )
         ]
 
-    def rank(self, *, candidates, target_date, timezone_name, top_n):
+    def rank(self, *, candidates, target_date, timezone_name, top_n, audience_profile):
         self.last_rank_candidates = candidates
         return [
             DigestEntry(
@@ -126,7 +126,7 @@ def test_build_shortlist_keeps_robotics_spotlight(tmp_path: Path) -> None:
         canonical_id="robotics",
     )
 
-    shortlist = service.build_shortlist([llm_paper, robotics_paper])
+    shortlist = service.build_shortlist([llm_paper, robotics_paper], settings.default_profile())
 
     assert len(shortlist) == 2
     assert any(paper.canonical_id == "robotics" for paper in shortlist)
@@ -176,6 +176,6 @@ def test_build_shortlist_rescues_profile_fit_paper(tmp_path: Path) -> None:
         canonical_id="2604.01193v1",
     )
 
-    shortlist = service.build_shortlist(noisy_topical + [target])
+    shortlist = service.build_shortlist(noisy_topical + [target], settings.default_profile())
 
     assert any(paper.canonical_id == "2604.01193v1" for paper in shortlist)

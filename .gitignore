@@ -1,4 +1,5 @@
 .env
+digest_profiles.json
 .DS_Store
 out/
 state/*.jsonl

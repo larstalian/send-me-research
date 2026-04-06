@@ -5,9 +5,6 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "send-me-research"
 version = "0.1.0"
-authors = [
-  { name = "Lars" },
-]
 description = "Daily Codex-backed research digest for LLMs, agents, robotics, and cyber papers."
 readme = "README.md"
 requires-python = ">=3.11"

@@ -1,0 +1,35 @@
+{
+  "profiles": [
+    {
+      "name": "Default",
+      "recipients": ["you@example.com"],
+      "description": "LLMs, agents, robotics, and cyber/security with extra focus on post-training, fine-tuning, code generation, tool use, and agentic task performance.",
+      "priority_keywords": [
+        "post-training",
+        "fine-tuning",
+        "self-distillation",
+        "tool use",
+        "code generation",
+        "benchmark",
+        "agentic tasks",
+        "prompt injection",
+        "robotics"
+      ],
+      "top_n": 15
+    },
+    {
+      "name": "Security Team",
+      "recipients": ["security@example.com"],
+      "description": "Cybersecurity, agent security, prompt injection, jailbreaks, AI red teaming, and defensive evaluations.",
+      "priority_keywords": [
+        "prompt injection",
+        "jailbreak",
+        "red teaming",
+        "cybersecurity",
+        "defense",
+        "agent"
+      ],
+      "top_n": 10
+    }
+  ]
+}
