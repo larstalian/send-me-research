@@ -65,6 +65,7 @@ Useful optional vars:
 - `DIGEST_TIMEZONE` default: `America/Los_Angeles`
 - `CODEX_ENABLE_SEARCH` default: `true`
 - `CODEX_ENABLE_WILDCARD_DISCOVERY` default: `true`
+- `STATE_RETENTION_DAYS` default: `60`
 - `TOP_N` default: `15`
 - `ROBOTICS_SPOTLIGHT_COUNT` default: `2`
 
@@ -89,6 +90,8 @@ Set the GitHub repo variable:
 If unset, scheduled runs default to `self-hosted`.
 
 Both workflows are scheduled for 8:00 AM `America/Los_Angeles` and guard against duplicate UTC cron triggers.
+
+Workflow state is not committed to git anymore. Each run restores the newest `digest-state-*` Actions artifact, uses it for dedupe, prunes it to a rolling retention window, and uploads a fresh state artifact at the end.
 
 ## Hosted Runner Workaround
 
@@ -143,8 +146,8 @@ Then create these repo secrets yourself:
 
 - `src/send_me_research/` app code
 - `templates/` HTML template
-- `state/` dedupe + send history
+- `state/` local scratch state only
 - `out/` generated local outputs
 - `scripts/` secret/bootstrap helpers
 
-`out/` is intentionally not tracked in git anymore. Workflow runs upload digest files as GitHub Actions artifacts instead.
+`out/` is intentionally not tracked in git anymore. Workflow runs upload digest files as GitHub Actions artifacts instead, and automation state now lives in rolling Actions artifacts instead of git commits.

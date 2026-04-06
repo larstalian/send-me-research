@@ -7,7 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
-    HOME=/home/app
+    HOME=/home/app \
+    APP_HOME=/opt/send-me-research
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -28,14 +29,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g @openai/codex
 
-WORKDIR /workspace
+WORKDIR /opt/send-me-research
 
-COPY pyproject.toml uv.lock .python-version README.md /workspace/
-COPY src /workspace/src
-COPY templates /workspace/templates
+COPY pyproject.toml uv.lock .python-version README.md /opt/send-me-research/
+COPY src /opt/send-me-research/src
+COPY templates /opt/send-me-research/templates
 
 RUN uv sync --frozen --no-dev
 
-ENV PATH="/workspace/.venv/bin:$PATH"
+ENV PATH="/opt/send-me-research/.venv/bin:$PATH"
+
+WORKDIR /workspace
 
 CMD ["uv", "run", "send-me-research", "--help"]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, Iterable, List, Set
 
@@ -36,7 +36,6 @@ class StateStore:
         *,
         digest_date: str,
         subject: str,
-        output_dir: str,
         entries: Iterable[DigestEntry],
     ) -> None:
         entries = list(entries)
@@ -66,6 +65,22 @@ class StateStore:
             },
         )
 
+    def prune(self, *, retention_days: int, today: date | None = None) -> None:
+        today = today or datetime.utcnow().date()
+        cutoff = today - timedelta(days=max(retention_days, 0))
+        papers = [
+            row
+            for row in self._read_jsonl(self.papers_seen_path)
+            if self._row_digest_date(row) >= cutoff
+        ]
+        digests = [
+            row
+            for row in self._read_jsonl(self.digests_sent_path)
+            if self._row_digest_date(row) >= cutoff
+        ]
+        self._write_jsonl(self.papers_seen_path, papers)
+        self._write_jsonl(self.digests_sent_path, digests)
+
     def _read_jsonl(self, path: Path) -> List[Dict[str, object]]:
         rows: List[Dict[str, object]] = []
         if not path.exists():
@@ -81,3 +96,15 @@ class StateStore:
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=True, sort_keys=True))
             handle.write("\n")
+
+    def _write_jsonl(self, path: Path, rows: Iterable[Dict[str, object]]) -> None:
+        with path.open("w", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row, ensure_ascii=True, sort_keys=True))
+                handle.write("\n")
+
+    def _row_digest_date(self, row: Dict[str, object]) -> date:
+        raw = row.get("digest_date")
+        if isinstance(raw, str):
+            return date.fromisoformat(raw)
+        raise ValueError(f"State row is missing digest_date: {row}")

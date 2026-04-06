@@ -29,6 +29,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--send", action="store_true", help="Send the digest email after rendering.")
     run.set_defaults(handler=handle_run_digest)
 
+    prune = subparsers.add_parser("prune-state", help="Prune old local state rows.")
+    prune.add_argument("--days", dest="retention_days", type=int, default=60)
+    prune.add_argument("--today", dest="today", type=parse_date)
+    prune.set_defaults(handler=handle_prune_state)
+
     backfill = subparsers.add_parser("backfill", help="Preview digests across a date range.")
     backfill.add_argument("--from", dest="start_date", required=True, type=parse_date)
     backfill.add_argument("--to", dest="end_date", required=True, type=parse_date)
@@ -78,6 +83,17 @@ def handle_run_digest(args: argparse.Namespace) -> int:
             print("Send skipped because this digest date was already recorded as sent.")
         elif args.send:
             print("Digest email sent.")
+        return 0
+    finally:
+        service.close()
+
+
+def handle_prune_state(args: argparse.Namespace) -> int:
+    settings = AppSettings.from_env()
+    service = DigestService(settings)
+    try:
+        service.state.prune(retention_days=args.retention_days, today=args.today)
+        print(f"State pruned to the last {args.retention_days} days in {service.state.state_dir}.")
         return 0
     finally:
         service.close()

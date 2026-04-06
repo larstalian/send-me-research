@@ -1,6 +1,7 @@
 .env
 .DS_Store
 out/
+state/*.jsonl
 .venv/
 .pytest_cache/
 __pycache__/

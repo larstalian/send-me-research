@@ -99,7 +99,6 @@ class DigestService:
             self.state.record_send(
                 digest_date=digest_date,
                 subject=subject,
-                output_dir=str(output_dir),
                 entries=entries,
             )
 
