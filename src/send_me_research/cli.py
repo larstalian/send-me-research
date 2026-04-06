@@ -58,7 +58,6 @@ def handle_preview_digest(args: argparse.Namespace) -> int:
     try:
         result = service.preview_digest(target_date=args.target_date)
         print(f"Preview complete: {result.html_path}")
-        print(f"PDF written to: {result.pdf_path}")
         print(f"Entries: {len(result.entries)}")
         return 0
     finally:
@@ -77,7 +76,6 @@ def handle_run_digest(args: argparse.Namespace) -> int:
             raise
         print(f"Digest output: {result.output_dir}")
         print(f"HTML: {result.html_path}")
-        print(f"PDF: {result.pdf_path}")
         print(f"Entries: {len(result.entries)}")
         if result.skipped_send:
             print("Send skipped because this digest date was already recorded as sent.")

@@ -73,18 +73,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             curl \
             git \
-            libcairo2 \
-            libffi-dev \
-            libfontconfig1 \
-            libgdk-pixbuf-2.0-0 \
-            libharfbuzz-dev \
-            libpango-1.0-0 \
-            libpangocairo-1.0-0 \
-            libpangoft2-1.0-0 \
             nodejs \
-            npm \
-            shared-mime-info \
-            fonts-dejavu-core
+            npm
 
       - name: Install uv
         if: env.SHOULD_RUN == 'true'

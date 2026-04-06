@@ -76,7 +76,6 @@ class DigestPayload:
 @dataclass
 class RenderedDigest:
     html: str
-    pdf_bytes: bytes
     subject: str
     digest_date: date
     output_dir: str
@@ -88,6 +87,5 @@ class DigestRunResult:
     entries: List[DigestEntry]
     output_dir: str
     html_path: str
-    pdf_path: str
     subject: str
     skipped_send: bool = False

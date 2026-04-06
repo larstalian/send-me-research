@@ -48,13 +48,11 @@ def test_render_writes_html_and_pdf(tmp_path: Path) -> None:
     template_dir = Path(__file__).resolve().parents[1] / "templates"
     renderer = DigestRenderer(template_dir)
     rendered = renderer.render(make_payload(), output_dir=tmp_path)
-    html_path, pdf_path = renderer.write(rendered)
+    html_path = renderer.write(rendered)
 
     html = Path(html_path).read_text(encoding="utf-8")
-    pdf = Path(pdf_path).read_bytes()
 
     assert "Agentic Security for LLM Workflows" in html
     assert "Origin &amp; Signal" in html
     assert "Example University and Example Labs; arXiv preprint." in html
     assert build_chatgpt_link("https://example.com") in html
-    assert pdf.startswith(b"%PDF")

@@ -13,18 +13,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
-    libcairo2 \
-    libffi-dev \
-    libfontconfig1 \
-    libgdk-pixbuf-2.0-0 \
-    libharfbuzz-dev \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libpangoft2-1.0-0 \
     nodejs \
     npm \
-    shared-mime-info \
-    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g @openai/codex

@@ -7,7 +7,7 @@ Daily paper digest for:
 - robotics / embodied AI
 - cyber / AI security
 
-It collects new papers from arXiv and OpenAlex, dedupes them, lets Codex rank and annotate the shortlist, then sends a clean HTML email. Local runs still write HTML and PDF artifacts to `out/`.
+It collects new papers from arXiv and OpenAlex, dedupes them, lets Codex rank and annotate the shortlist, then sends a clean HTML email. Local runs write HTML artifacts to `out/`.
 
 ## Stack
 

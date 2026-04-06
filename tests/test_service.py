@@ -84,7 +84,6 @@ def test_preview_digest_writes_artifacts(tmp_path: Path) -> None:
     result = service.preview_digest(target_date=date(2026, 3, 30))
 
     assert Path(result.html_path).exists()
-    assert Path(result.pdf_path).exists()
     manifest = Path(result.output_dir) / "manifest.json"
     assert manifest.exists()
     assert len(result.entries) == 1

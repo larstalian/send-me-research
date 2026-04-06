@@ -46,7 +46,6 @@ class DigestService:
                 entries=[],
                 output_dir=str(output_dir),
                 html_path=str(output_dir / "digest.html"),
-                pdf_path=str(output_dir / "digest.pdf"),
                 subject=build_subject(digest_date, 0),
                 skipped_send=True,
             )
@@ -69,7 +68,7 @@ class DigestService:
         )
         output_dir = self._output_dir_for_date(target_date)
         rendered = self.renderer.render(payload, output_dir=output_dir)
-        html_path, pdf_path = self.renderer.write(rendered)
+        html_path = self.renderer.write(rendered)
         self._write_manifest(output_dir, payload)
 
         if send:
@@ -105,7 +104,6 @@ class DigestService:
             entries=entries,
             output_dir=str(output_dir),
             html_path=html_path,
-            pdf_path=pdf_path,
             subject=subject,
             skipped_send=False,
         )
