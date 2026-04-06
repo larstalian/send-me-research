@@ -92,6 +92,7 @@ def test_codex_ranker_uses_schema_output() -> None:
     assert entries[0].section == "LLMs"
     assert entries[0].provenance == "Example Lab at Example University; arXiv preprint."
     assert entries[0].signal_score == 7.8
+    assert "profile_hints" in ranker._build_prompt([record], target_date=date(2026, 3, 30), timezone_name="America/Los_Angeles", top_n=15)
 
 
 def test_codex_auth_check() -> None:

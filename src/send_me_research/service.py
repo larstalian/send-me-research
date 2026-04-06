@@ -10,7 +10,7 @@ from .config import AppSettings
 from .dedupe import dedupe_records, filter_unseen
 from .mail import Mailer
 from .models import DigestEntry, DigestPayload, DigestRunResult, PaperRecord
-from .normalize import build_window, section_sort_key
+from .normalize import PROFILE_ORDER, SECTION_ORDER, build_window, section_sort_key
 from .render import DigestRenderer, build_subject
 from .sources import SourceClient
 from .state import StateStore
@@ -150,7 +150,7 @@ class DigestService:
         )
         records = dedupe_records(records)
         records = [record for record in records if record.heuristic_score >= 1.5]
-        records.sort(key=lambda paper: (paper.heuristic_score, paper.published_at), reverse=True)
+        records.sort(key=lambda paper: (paper.screening_score, paper.published_at), reverse=True)
         enriched: List[PaperRecord] = []
         for record in records[: max(self.settings.codex_shortlist_size, self.settings.top_n)]:
             if not record.abstract or not record.doi:
@@ -161,7 +161,7 @@ class DigestService:
             enriched.append(record)
         enriched.extend(records[max(self.settings.codex_shortlist_size, self.settings.top_n) :])
         enriched = dedupe_records(enriched)
-        enriched.sort(key=lambda paper: (paper.heuristic_score, paper.published_at), reverse=True)
+        enriched.sort(key=lambda paper: (paper.screening_score, paper.published_at), reverse=True)
         return enriched
 
     def augment_candidates_with_codex_discoveries(self, *, window, target_date: date, candidates: List[PaperRecord]) -> List[PaperRecord]:
@@ -184,7 +184,7 @@ class DigestService:
                 in_window.append(paper)
 
         merged = dedupe_records(candidates + in_window)
-        merged.sort(key=lambda paper: (paper.heuristic_score, paper.published_at), reverse=True)
+        merged.sort(key=lambda paper: (paper.screening_score, paper.published_at), reverse=True)
         return merged
 
     def rank_entries(self, candidates: List[PaperRecord], *, target_date: date) -> List[DigestEntry]:
@@ -200,21 +200,57 @@ class DigestService:
         return entries
 
     def build_shortlist(self, candidates: List[PaperRecord]) -> List[PaperRecord]:
-        shortlist = list(candidates[: self.settings.codex_shortlist_size])
-        if self.settings.robotics_spotlight_count <= 0:
-            return shortlist
+        ranked = sorted(candidates, key=lambda paper: (paper.screening_score, paper.published_at), reverse=True)
+        shortlist: List[PaperRecord] = []
+        selected_ids = set()
+        shortlist_target = self.settings.codex_shortlist_size + max(self.settings.robotics_spotlight_count, 0)
 
-        selected_ids = {paper.canonical_id for paper in shortlist}
-        robotics_candidates = [
-            paper
-            for paper in candidates
-            if "Robotics" in paper.topic_hints
-            and paper.heuristic_score >= self.settings.robotics_min_heuristic_score
-            and paper.canonical_id not in selected_ids
-        ]
-        shortlist.extend(robotics_candidates[: self.settings.robotics_spotlight_count])
-        shortlist.sort(key=lambda paper: (paper.heuristic_score, paper.published_at), reverse=True)
-        return shortlist
+        def extend_unique(pool: List[PaperRecord], limit: int) -> None:
+            added = 0
+            for paper in pool:
+                if paper.canonical_id in selected_ids:
+                    continue
+                shortlist.append(paper)
+                selected_ids.add(paper.canonical_id)
+                added += 1
+                if len(shortlist) >= shortlist_target:
+                    return
+                if limit and added >= limit:
+                    return
+
+        extend_unique(ranked, self.settings.shortlist_core_size)
+        if len(shortlist) >= shortlist_target:
+            return shortlist[:shortlist_target]
+
+        for section in SECTION_ORDER[:-1]:
+            extend_unique(
+                [paper for paper in ranked if section in paper.topic_hints],
+                self.settings.shortlist_per_section,
+            )
+            if len(shortlist) >= shortlist_target:
+                return shortlist[:shortlist_target]
+
+        for profile in PROFILE_ORDER:
+            extend_unique(
+                [paper for paper in ranked if profile in paper.profile_hints],
+                self.settings.shortlist_per_profile,
+            )
+            if len(shortlist) >= shortlist_target:
+                return shortlist[:shortlist_target]
+
+        if self.settings.robotics_spotlight_count > 0:
+            extend_unique(
+                [
+                    paper
+                    for paper in ranked
+                    if "Robotics" in paper.topic_hints
+                    and paper.heuristic_score >= self.settings.robotics_min_heuristic_score
+                ],
+                self.settings.robotics_spotlight_count,
+            )
+
+        shortlist.sort(key=lambda paper: (paper.screening_score, paper.published_at), reverse=True)
+        return shortlist[:shortlist_target]
 
     def build_summary(self, entries: List[DigestEntry]) -> str:
         if not entries:

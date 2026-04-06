@@ -131,3 +131,52 @@ def test_build_shortlist_keeps_robotics_spotlight(tmp_path: Path) -> None:
 
     assert len(shortlist) == 2
     assert any(paper.canonical_id == "robotics" for paper in shortlist)
+
+
+def test_build_shortlist_rescues_profile_fit_paper(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    settings = AppSettings.from_env(repo_root)
+    settings.state_dir = tmp_path / "state"
+    settings.output_dir = tmp_path / "out"
+    settings.codex_shortlist_size = 8
+    settings.shortlist_core_size = 2
+    settings.shortlist_per_section = 0
+    settings.shortlist_per_profile = 2
+    settings.robotics_spotlight_count = 0
+    service = DigestService(settings)
+
+    noisy_topical = []
+    for index in range(6):
+        noisy_topical.append(
+            build_paper_record(
+                title=f"Agentic Security Paper {index}",
+                abstract="LLM agent prompt injection security benchmark with robots and workflows.",
+                authors=["Author"],
+                published_at=datetime(2026, 4, 2, tzinfo=timezone.utc),
+                source="OpenAlex",
+                landing_url=f"https://example.com/noisy-{index}",
+                pdf_url=None,
+                doi=None,
+                source_ids=[f"noisy-{index}"],
+                extras=["cs.AI", "cs.CR"],
+                canonical_id=f"noisy-{index}",
+            )
+        )
+
+    target = build_paper_record(
+        title="Embarrassingly Simple Self-Distillation Improves Code Generation",
+        abstract="A post-training method for LLM code generation that improves LiveCodeBench performance without a verifier or RL.",
+        authors=["Ruixiang Zhang"],
+        published_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
+        source="arXiv",
+        landing_url="https://arxiv.org/abs/2604.01193",
+        pdf_url=None,
+        doi=None,
+        source_ids=["2604.01193v1"],
+        extras=["cs.CL"],
+        canonical_id="2604.01193v1",
+    )
+
+    shortlist = service.build_shortlist(noisy_topical + [target])
+
+    assert any(paper.canonical_id == "2604.01193v1" for paper in shortlist)

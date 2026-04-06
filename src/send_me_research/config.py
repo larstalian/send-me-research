@@ -33,7 +33,10 @@ class AppSettings:
     output_dir: Path = Path("out")
     contact_email: Optional[str] = None
     top_n: int = 15
-    codex_shortlist_size: int = 25
+    codex_shortlist_size: int = 80
+    shortlist_core_size: int = 36
+    shortlist_per_section: int = 12
+    shortlist_per_profile: int = 10
     robotics_spotlight_count: int = 2
     robotics_min_heuristic_score: float = 2.5
     arxiv_max_results: int = 250
@@ -67,7 +70,10 @@ class AppSettings:
             output_dir=output_dir,
             contact_email=os.getenv("OPENALEX_MAILTO"),
             top_n=int(os.getenv("TOP_N", "15")),
-            codex_shortlist_size=int(os.getenv("CODEX_SHORTLIST_SIZE", "25")),
+            codex_shortlist_size=int(os.getenv("CODEX_SHORTLIST_SIZE", "80")),
+            shortlist_core_size=int(os.getenv("SHORTLIST_CORE_SIZE", "36")),
+            shortlist_per_section=int(os.getenv("SHORTLIST_PER_SECTION", "12")),
+            shortlist_per_profile=int(os.getenv("SHORTLIST_PER_PROFILE", "10")),
             robotics_spotlight_count=int(os.getenv("ROBOTICS_SPOTLIGHT_COUNT", "2")),
             robotics_min_heuristic_score=float(os.getenv("ROBOTICS_MIN_HEURISTIC_SCORE", "2.5")),
             arxiv_max_results=int(os.getenv("ARXIV_MAX_RESULTS", "250")),

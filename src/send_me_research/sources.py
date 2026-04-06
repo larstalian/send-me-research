@@ -23,6 +23,13 @@ from .normalize import (
 OPENALEX_QUERIES = [
     "large language model",
     "foundation model",
+    "fine-tuning large language model",
+    "post-training language model",
+    "self-distillation language model",
+    "model distillation",
+    "code generation language model",
+    "coding benchmark llm",
+    "tool use benchmark",
     "language agent",
     "agentic systems",
     "multi-agent",

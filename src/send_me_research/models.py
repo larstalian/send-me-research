@@ -18,7 +18,10 @@ class PaperRecord:
     doi: Optional[str] = None
     source_ids: List[str] = field(default_factory=list)
     topic_hints: List[str] = field(default_factory=list)
+    profile_hints: List[str] = field(default_factory=list)
     heuristic_score: float = 0.0
+    profile_score: float = 0.0
+    screening_score: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)

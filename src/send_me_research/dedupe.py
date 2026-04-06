@@ -18,8 +18,11 @@ def merge_records(primary: PaperRecord, secondary: PaperRecord) -> PaperRecord:
         primary.landing_url = secondary.landing_url
     primary.source_ids = list(dict.fromkeys(primary.source_ids + secondary.source_ids))
     primary.topic_hints = list(dict.fromkeys(primary.topic_hints + secondary.topic_hints))
+    primary.profile_hints = list(dict.fromkeys(primary.profile_hints + secondary.profile_hints))
     primary.authors = primary.authors or secondary.authors
     primary.heuristic_score = max(primary.heuristic_score, secondary.heuristic_score)
+    primary.profile_score = max(primary.profile_score, secondary.profile_score)
+    primary.screening_score = max(primary.screening_score, secondary.screening_score)
     return primary
 
 

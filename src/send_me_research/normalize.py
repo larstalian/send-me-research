@@ -11,6 +11,13 @@ from .models import DateWindow, PaperRecord
 
 ARXIV_NAMESPACE = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
 SECTION_ORDER = ("LLMs", "Agents", "Robotics", "Cyber", "Other relevant")
+PROFILE_ORDER = (
+    "Post-training",
+    "Code Generation",
+    "Agentic Fit",
+    "Benchmarks & Evals",
+    "Inference & Efficiency",
+)
 
 NON_ABSTRACT_PATTERNS = (
     r"\bhardware requirements?\b",
@@ -96,6 +103,74 @@ SECTION_KEYWORDS: Dict[str, List[str]] = {
     ],
 }
 
+PROFILE_KEYWORDS: Dict[str, List[str]] = {
+    "Post-training": [
+        "fine-tuning",
+        "fine tuning",
+        "post-training",
+        "post training",
+        "instruction tuning",
+        "supervised fine-tuning",
+        "supervised finetuning",
+        "sft",
+        "distillation",
+        "self-distillation",
+        "self distillation",
+        "preference optimization",
+        "dpo",
+        "grpo",
+        "reward model",
+        "policy optimization",
+        "alignment tuning",
+    ],
+    "Code Generation": [
+        "code generation",
+        "coding",
+        "code model",
+        "code synthesis",
+        "program synthesis",
+        "livecodebench",
+        "swe-bench",
+        "verifier",
+        "execution",
+        "unit test",
+        "compiler",
+    ],
+    "Agentic Fit": [
+        "agent",
+        "agentic",
+        "tool use",
+        "tool-use",
+        "web agent",
+        "computer use",
+        "planning",
+        "multi-step",
+        "multi step",
+    ],
+    "Benchmarks & Evals": [
+        "benchmark",
+        "evaluation",
+        "eval",
+        "leaderboard",
+        "pass@1",
+        "pass@k",
+        "harder problems",
+        "real-world",
+        "real world",
+    ],
+    "Inference & Efficiency": [
+        "inference",
+        "test-time",
+        "test time",
+        "decoding",
+        "token distribution",
+        "kv-cache",
+        "kv cache",
+        "compression",
+        "efficiency",
+    ],
+}
+
 
 def build_window(target_date: date, timezone_name: str) -> DateWindow:
     tz = ZoneInfo(timezone_name)
@@ -172,6 +247,20 @@ def guess_topic_hints(title: str, abstract: str, extras: Iterable[str] | None = 
     return [section for section in SECTION_ORDER if section in hints]
 
 
+def guess_profile_hints(title: str, abstract: str, extras: Iterable[str] | None = None) -> List[str]:
+    haystack = f"{title} {abstract}".lower()
+    hints = set()
+    for profile, keywords in PROFILE_KEYWORDS.items():
+        if any(keyword in haystack for keyword in keywords):
+            hints.add(profile)
+    if extras:
+        for item in extras:
+            lowered = (item or "").lower()
+            if lowered.startswith(("cs.cl", "cs.ai", "cs.lg")):
+                hints.add("Post-training")
+    return [profile for profile in PROFILE_ORDER if profile in hints]
+
+
 def heuristic_relevance_score(record: PaperRecord) -> float:
     text = f"{record.title} {record.abstract}".lower()
     score = 0.0
@@ -192,6 +281,34 @@ def heuristic_relevance_score(record: PaperRecord) -> float:
     if record.abstract:
         score += min(len(record.abstract) / 1000.0, 1.0)
     return score
+
+
+def profile_relevance_score(record: PaperRecord) -> float:
+    text = f"{record.title} {record.abstract}".lower()
+    score = 0.0
+    for profile, keywords in PROFILE_KEYWORDS.items():
+        matches = sum(1 for keyword in keywords if keyword in text)
+        if not matches:
+            continue
+        if profile == "Post-training":
+            score += min(matches, 4) * 1.6
+        elif profile == "Code Generation":
+            score += min(matches, 4) * 1.5
+        elif profile == "Agentic Fit":
+            score += min(matches, 3) * 1.2
+        else:
+            score += min(matches, 3) * 1.0
+    if "Post-training" in record.profile_hints and "Agentic Fit" in record.profile_hints:
+        score += 1.5
+    if "Code Generation" in record.profile_hints and "Benchmarks & Evals" in record.profile_hints:
+        score += 1.0
+    if record.source == "arXiv":
+        score += 0.5
+    return score
+
+
+def screening_score(record: PaperRecord) -> float:
+    return record.heuristic_score + (1.35 * record.profile_score)
 
 
 def section_from_hints(topic_hints: List[str]) -> str:
@@ -236,6 +353,7 @@ def build_paper_record(
     if looks_like_non_abstract_text(sanitized_abstract):
         sanitized_abstract = ""
     hints = guess_topic_hints(title, sanitized_abstract, extras)
+    profile_hints = guess_profile_hints(title, sanitized_abstract, extras)
     record = PaperRecord(
         canonical_id=canonical_id or doi or title_hash(title),
         title=clean_whitespace(title),
@@ -248,6 +366,9 @@ def build_paper_record(
         doi=doi,
         source_ids=[item for item in source_ids if item],
         topic_hints=hints,
+        profile_hints=profile_hints,
     )
     record.heuristic_score = heuristic_relevance_score(record)
+    record.profile_score = profile_relevance_score(record)
+    record.screening_score = screening_score(record)
     return record
