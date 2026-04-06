@@ -1,0 +1,133 @@
+from datetime import date, datetime, timezone
+from pathlib import Path
+
+from send_me_research.config import AppSettings
+from send_me_research.models import DigestEntry
+from send_me_research.normalize import build_paper_record
+from send_me_research.service import DigestService
+
+
+class FakeSourceClient:
+    def fetch_arxiv(self, window, max_results=250):
+        return [
+            build_paper_record(
+                title="Agentic Security for LLM Systems",
+                abstract="Prompt injection defense for LLM agents.",
+                authors=["Alice"],
+                published_at=datetime(2026, 3, 30, tzinfo=timezone.utc),
+                source="arXiv",
+                landing_url="https://arxiv.org/abs/2503.00001",
+                pdf_url="https://arxiv.org/pdf/2503.00001.pdf",
+                doi=None,
+                source_ids=["arxiv:2503.00001"],
+                extras=["cs.CL", "cs.CR"],
+                canonical_id="arxiv:2503.00001",
+            )
+        ]
+
+    def fetch_openalex(self, window, per_page=100, max_pages=2):
+        return []
+
+    def enrich_with_crossref(self, record):
+        return record
+
+    def close(self):
+        return None
+
+
+class FakeRanker:
+    def __init__(self):
+        self.last_rank_candidates = []
+
+    def auth_check(self):
+        return "Logged in using ChatGPT"
+
+    def discover_wildcards(self, *, target_date, timezone_name, max_candidates, existing_candidates):
+        return [
+            build_paper_record(
+                title="Discovered Cyber Paper",
+                abstract="A web-discovered prompt injection paper.",
+                authors=["Bob"],
+                published_at=datetime(2026, 3, 29, tzinfo=timezone.utc),
+                source="CodexDiscovery",
+                landing_url="https://example.com/discovered",
+                pdf_url=None,
+                doi=None,
+                source_ids=["https://example.com/discovered"],
+                extras=["prompt injection", "cybersecurity"],
+                canonical_id="https://example.com/discovered",
+            )
+        ]
+
+    def rank(self, *, candidates, target_date, timezone_name, top_n):
+        self.last_rank_candidates = candidates
+        return [
+            DigestEntry(
+                paper=candidates[0],
+                section="Cyber",
+                rank_score=9.5,
+                why_it_matters="Direct fit for the digest.",
+            )
+        ]
+
+
+def test_preview_digest_writes_artifacts(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    settings = AppSettings.from_env(repo_root)
+    settings.state_dir = tmp_path / "state"
+    settings.output_dir = tmp_path / "out"
+    service = DigestService(settings)
+    service.source_client = FakeSourceClient()
+    fake_ranker = FakeRanker()
+    service.rank = fake_ranker
+
+    result = service.preview_digest(target_date=date(2026, 3, 30))
+
+    assert Path(result.html_path).exists()
+    assert Path(result.pdf_path).exists()
+    manifest = Path(result.output_dir) / "manifest.json"
+    assert manifest.exists()
+    assert len(result.entries) == 1
+    assert any(candidate.canonical_id == "https://example.com/discovered" for candidate in fake_ranker.last_rank_candidates)
+
+
+def test_build_shortlist_keeps_robotics_spotlight(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    settings = AppSettings.from_env(repo_root)
+    settings.state_dir = tmp_path / "state"
+    settings.output_dir = tmp_path / "out"
+    settings.codex_shortlist_size = 1
+    settings.robotics_spotlight_count = 1
+    service = DigestService(settings)
+
+    llm_paper = build_paper_record(
+        title="Foundation Models for Agents",
+        abstract="Large language model agents with planning.",
+        authors=["Alice"],
+        published_at=datetime(2026, 3, 30, tzinfo=timezone.utc),
+        source="arXiv",
+        landing_url="https://example.com/llm",
+        pdf_url=None,
+        doi=None,
+        source_ids=["llm"],
+        extras=["cs.AI"],
+        canonical_id="llm",
+    )
+    robotics_paper = build_paper_record(
+        title="Embodied Robot Learning with Vision-Language-Action Policies",
+        abstract="A robotics paper about embodied manipulation and sim2real transfer.",
+        authors=["Bob"],
+        published_at=datetime(2026, 3, 30, tzinfo=timezone.utc),
+        source="arXiv",
+        landing_url="https://example.com/robotics",
+        pdf_url=None,
+        doi=None,
+        source_ids=["robotics"],
+        extras=["cs.RO"],
+        canonical_id="robotics",
+    )
+
+    shortlist = service.build_shortlist([llm_paper, robotics_paper])
+
+    assert len(shortlist) == 2
+    assert any(paper.canonical_id == "robotics" for paper in shortlist)

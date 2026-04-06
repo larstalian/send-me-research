@@ -1,0 +1,8 @@
+.env
+.DS_Store
+out/
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+src/send_me_research.egg-info/

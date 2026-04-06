@@ -1,0 +1,173 @@
+name: Daily Research Digest (Hosted Codex Auth)
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_date:
+        description: Optional digest date in YYYY-MM-DD format
+        required: false
+        type: string
+      send:
+        description: Send the digest email
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 15 * * *"
+    - cron: "0 16 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-research-digest-hosted-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    env:
+      DIGEST_TIMEZONE: America/Los_Angeles
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve date and send mode
+        shell: bash
+        run: |
+          SHOULD_RUN=true
+          AUTOMATION_MODE="${{ vars.DIGEST_AUTOMATION_MODE || 'self-hosted' }}"
+          if [[ -n "${{ github.event.inputs.target_date }}" ]]; then
+            TARGET_DATE="${{ github.event.inputs.target_date }}"
+          else
+            TARGET_DATE="$(TZ=America/Los_Angeles date +%F)"
+          fi
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            if [[ "$AUTOMATION_MODE" != "hosted" ]]; then
+              SHOULD_RUN=false
+            fi
+            LOCAL_HOUR="$(TZ=America/Los_Angeles date +%H)"
+            if [[ "$LOCAL_HOUR" != "08" ]]; then
+              SHOULD_RUN=false
+            fi
+            SEND=true
+          else
+            SEND="${{ github.event.inputs.send || 'false' }}"
+          fi
+          echo "TARGET_DATE=$TARGET_DATE" >> "$GITHUB_ENV"
+          echo "SEND=$SEND" >> "$GITHUB_ENV"
+          echo "SHOULD_RUN=$SHOULD_RUN" >> "$GITHUB_ENV"
+          echo "AUTOMATION_MODE=$AUTOMATION_MODE" >> "$GITHUB_ENV"
+
+      - name: Install system dependencies
+        if: env.SHOULD_RUN == 'true'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            curl \
+            git \
+            libcairo2 \
+            libffi-dev \
+            libfontconfig1 \
+            libgdk-pixbuf-2.0-0 \
+            libharfbuzz-dev \
+            libpango-1.0-0 \
+            libpangocairo-1.0-0 \
+            libpangoft2-1.0-0 \
+            nodejs \
+            npm \
+            shared-mime-info \
+            fonts-dejavu-core
+
+      - name: Install uv
+        if: env.SHOULD_RUN == 'true'
+        shell: bash
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install Codex CLI
+        if: env.SHOULD_RUN == 'true'
+        shell: bash
+        run: npm install -g @openai/codex
+
+      - name: Restore minimal Codex auth
+        if: env.SHOULD_RUN == 'true'
+        shell: bash
+        env:
+          CODEX_AUTH_JSON_BASE64: ${{ secrets.CODEX_AUTH_JSON_BASE64 }}
+          CODEX_CONFIG_TOML_BASE64: ${{ secrets.CODEX_CONFIG_TOML_BASE64 }}
+        run: |
+          if [[ -z "${CODEX_AUTH_JSON_BASE64:-}" || -z "${CODEX_CONFIG_TOML_BASE64:-}" ]]; then
+            echo "Missing hosted Codex auth secrets. Run scripts/sync_github_hosted_secrets.sh or set CODEX_AUTH_JSON_BASE64 and CODEX_CONFIG_TOML_BASE64." >&2
+            exit 1
+          fi
+          mkdir -p "$HOME/.codex"
+          printf '%s' "$CODEX_AUTH_JSON_BASE64" | base64 --decode > "$HOME/.codex/auth.json"
+          printf '%s' "$CODEX_CONFIG_TOML_BASE64" | base64 --decode > "$HOME/.codex/config.toml"
+          if [[ ! -s "$HOME/.codex/auth.json" ]]; then
+            echo "CODEX_AUTH_JSON_BASE64 decoded to an empty auth.json. Re-sync the secret." >&2
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          json.loads(Path.home().joinpath(".codex", "auth.json").read_text(encoding="utf-8"))
+          PY
+          chmod 600 "$HOME/.codex/auth.json" "$HOME/.codex/config.toml"
+          codex login status
+
+      - name: Sync project
+        if: env.SHOULD_RUN == 'true'
+        shell: bash
+        run: uv sync --frozen --group dev
+
+      - name: Build preview or send digest
+        if: env.SHOULD_RUN == 'true'
+        shell: bash
+        env:
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          OPENALEX_MAILTO: ${{ secrets.OPENALEX_MAILTO }}
+        run: |
+          if [[ "$SEND" == "true" ]]; then
+            uv run send-me-research run-digest --date "$TARGET_DATE" --send
+          else
+            uv run send-me-research preview-digest --date "$TARGET_DATE"
+          fi
+
+      - name: Upload digest artifact
+        if: success() && env.SHOULD_RUN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ env.TARGET_DATE }}-hosted
+          path: out/digests/${{ env.TARGET_DATE }}
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Commit updated state
+        if: success() && env.SHOULD_RUN == 'true'
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain state)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add state
+            git commit -m "Update hosted digest state for $TARGET_DATE"
+            git push
+          fi
+
+      - name: Skip off-hour duplicate cron
+        if: env.SHOULD_RUN != 'true'
+        shell: bash
+        run: echo "Skipping scheduled run for mode '$AUTOMATION_MODE' or because it is not 08:00 in America/Los_Angeles."

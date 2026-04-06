@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+import smtplib
+from email.message import EmailMessage
+from typing import Iterable, Optional
+
+
+class Mailer:
+    def __init__(
+        self,
+        *,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        sender: str,
+    ) -> None:
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+        self.sender = sender
+
+    def send_digest(
+        self,
+        *,
+        recipients: Iterable[str],
+        subject: str,
+        html_body: str,
+        pdf_bytes: bytes,
+        pdf_name: str,
+    ) -> None:
+        message = EmailMessage()
+        message["Subject"] = subject
+        message["From"] = self.sender
+        message["To"] = ", ".join(recipients)
+        message.set_content("This digest is best viewed in an HTML-capable email client.")
+        message.add_alternative(html_body, subtype="html")
+        message.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=pdf_name)
+        self._send(message)
+
+    def send_text(
+        self,
+        *,
+        recipients: Iterable[str],
+        subject: str,
+        body: str,
+    ) -> None:
+        message = EmailMessage()
+        message["Subject"] = subject
+        message["From"] = self.sender
+        message["To"] = ", ".join(recipients)
+        message.set_content(body)
+        self._send(message)
+
+    def _send(self, message: EmailMessage) -> None:
+        with smtplib.SMTP_SSL(self.host, self.port) as smtp:
+            smtp.login(self.username, self.password)
+            smtp.send_message(message)
