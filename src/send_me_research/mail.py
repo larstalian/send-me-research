@@ -27,8 +27,6 @@ class Mailer:
         recipients: Iterable[str],
         subject: str,
         html_body: str,
-        pdf_bytes: bytes,
-        pdf_name: str,
     ) -> None:
         message = EmailMessage()
         message["Subject"] = subject
@@ -36,7 +34,6 @@ class Mailer:
         message["To"] = ", ".join(recipients)
         message.set_content("This digest is best viewed in an HTML-capable email client.")
         message.add_alternative(html_body, subtype="html")
-        message.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=pdf_name)
         self._send(message)
 
     def send_text(

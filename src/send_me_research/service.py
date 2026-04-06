@@ -87,8 +87,6 @@ class DigestService:
                     recipients=[self.settings.email_to or ""],
                     subject=subject,
                     html_body=rendered.html,
-                    pdf_bytes=rendered.pdf_bytes,
-                    pdf_name=f"research-digest-{digest_date}.pdf",
                 )
             else:
                 mailer.send_text(
