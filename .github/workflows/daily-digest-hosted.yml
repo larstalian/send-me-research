@@ -117,7 +117,7 @@ jobs:
       - name: Sync project
         if: env.SHOULD_RUN == 'true'
         shell: bash
-        run: uv sync --frozen --group dev
+        run: uv sync --frozen
 
       - name: Restore latest state artifact
         if: env.SHOULD_RUN == 'true'

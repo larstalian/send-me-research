@@ -29,7 +29,7 @@ with extra weight on post-training, fine-tuning, code generation, tool use, and 
 5. Install deps:
 
 ```bash
-uv sync --group dev
+uv sync
 ```
 
 Use Gmail with an app password, not your normal password.
