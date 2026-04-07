@@ -18,7 +18,7 @@ Out of the box, the default audience is:
 - robotics / embodied AI
 - cyber / AI security
 
-with extra weight on post-training, fine-tuning, code generation, tool use, and agentic-task improvement. You can keep that default, or define completely different stacks per recipient.
+with extra weight on post-training, fine-tuning, code generation, tool use, and agentic-task improvement. You can keep that default, or define completely different stacks per recipient in [`digest_profiles.example.json`](digest_profiles.example.json) or the [Multiple People, Different Stacks](#multiple-people-different-stacks) section below.
 
 ## Setup
 
