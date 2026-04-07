@@ -1,13 +1,22 @@
 # Send Me Research
 
-Daily Codex-backed paper digests for:
+Configurable Codex-backed daily paper digests.
+
+It pulls fresh papers from arXiv and OpenAlex, dedupes them, lets Codex rank the interesting ones, and sends a clean HTML email.
+
+You can run it in two ways:
+
+- one default digest from `.env`
+- multiple custom digests with different recipients and different research priorities
+
+The built-in default audience is:
 
 - LLMs
 - agents
 - robotics / embodied AI
 - cyber / AI security
 
-It pulls fresh papers from arXiv and OpenAlex, dedupes them, lets Codex rank the interesting ones, and sends a clean HTML email.
+with extra weight on post-training, fine-tuning, code generation, tool use, and agentic-task improvement.
 
 ## Setup
 
