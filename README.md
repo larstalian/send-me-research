@@ -6,6 +6,8 @@ This project watches fresh papers from arXiv and OpenAlex, dedupes them, lets Co
 
 It is built around a specific deployment trick: the hosted GitHub Actions workflow can reuse your existing Codex ChatGPT login by restoring a minimal `~/.codex` home from GitHub secrets. That means the ranking step can run in Actions without switching the project over to an OpenAI API key.
 
+A live sample digest is published at [larstalian.github.io/send-me-research](https://larstalian.github.io/send-me-research/).
+
 You can run it in two modes:
 
 - one default digest from `.env`
@@ -19,20 +21,6 @@ Out of the box, the default audience is:
 - cyber / AI security
 
 with extra weight on post-training, fine-tuning, code generation, tool use, and agentic-task improvement. You can keep that default, or define completely different stacks per recipient in [`digest_profiles.example.json`](digest_profiles.example.json) or the [Multiple People, Different Stacks](#multiple-people-different-stacks) section below.
-
-## Example Output
-
-Live example:
-
-- [GitHub Pages sample digest](https://larstalian.github.io/send-me-research/)
-
-The sample page is published automatically from this repo.
-
-To regenerate the example locally:
-
-```bash
-uv run python scripts/render_example_digest.py
-```
 
 ## Setup
 
