@@ -20,6 +20,22 @@ Out of the box, the default audience is:
 
 with extra weight on post-training, fine-tuning, code generation, tool use, and agentic-task improvement. You can keep that default, or define completely different stacks per recipient in [`digest_profiles.example.json`](digest_profiles.example.json) or the [Multiple People, Different Stacks](#multiple-people-different-stacks) section below.
 
+## Example Output
+
+A checked-in sample digest lives at [`examples/digest-example/digest.html`](examples/digest-example/digest.html).
+
+GitHub does not render HTML files in the repo as live pages by default, so on GitHub you will mostly see the source. To view the example as intended:
+
+- open the file locally in a browser
+- or publish the `examples/` folder with GitHub Pages
+- or use any HTML preview service against the raw file URL once the repo is public
+
+To regenerate the sample example locally:
+
+```bash
+uv run python scripts/render_example_digest.py
+```
+
 ## Setup
 
 1. Install `uv` and the Codex CLI.
