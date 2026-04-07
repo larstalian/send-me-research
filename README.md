@@ -2,7 +2,7 @@
 
 Configurable daily research digests powered by Codex.
 
-This project watches fresh papers from arXiv and OpenAlex, dedupes them, lets Codex decide what is actually worth reading, and sends polished HTML email digests to one or more recipients.
+This project automatically watches fresh papers from arXiv and OpenAlex every day, dedupes them, lets Codex decide what is actually worth reading, and sends polished HTML email digests to one or more recipients.
 
 It is built around a specific deployment trick: the hosted GitHub Actions workflow can reuse your existing Codex ChatGPT login by restoring a minimal `~/.codex` home from GitHub secrets. That means the ranking step can run in Actions without switching the project over to an OpenAI API key.
 
