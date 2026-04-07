@@ -9,44 +9,23 @@ Daily Codex-backed paper digests for:
 
 It pulls fresh papers from arXiv and OpenAlex, dedupes them, lets Codex rank the interesting ones, and sends a clean HTML email.
 
-## Quick Start
+## Setup
 
-1. Install `uv` and Codex CLI.
+1. Install `uv` and the Codex CLI.
 2. Run `codex login`.
-3. Copy `.env.example` to `.env` and fill in SMTP settings.
-4. Sync deps:
+3. Copy `.env.example` to `.env`.
+4. Fill in your SMTP settings.
+5. Install deps:
 
 ```bash
 uv sync --group dev
 ```
 
-5. Pick a date:
+Use Gmail with an app password, not your normal password.
 
-```bash
-TARGET_DATE="$(TZ=America/Los_Angeles date +%F)"
-```
+## Default Mode
 
-6. Preview:
-
-```bash
-set -a
-source .env
-set +a
-uv run send-me-research preview-digest --date "$TARGET_DATE"
-```
-
-7. Send:
-
-```bash
-set -a
-source .env
-set +a
-uv run send-me-research run-digest --date "$TARGET_DATE" --send
-```
-
-## Default Behavior
-
-If you do nothing beyond `.env`, the app sends one digest to `EMAIL_TO` using the built-in default audience:
+If you only use `.env`, the app sends one digest to `EMAIL_TO` using the built-in default audience:
 
 - LLMs
 - agents
@@ -54,11 +33,13 @@ If you do nothing beyond `.env`, the app sends one digest to `EMAIL_TO` using th
 - cyber / security
 - extra weight on post-training, fine-tuning, code generation, tool use, and agentic-task improvement
 
+That is the fastest path if this is mainly for you.
+
 ## Multiple People, Different Stacks
 
 Create `digest_profiles.json` from `digest_profiles.example.json`.
 
-Each profile can set:
+Each profile can define:
 
 - `name`
 - `recipients`
@@ -89,22 +70,57 @@ Example:
 }
 ```
 
-Useful commands:
+If `digest_profiles.json` is present, the app sends one digest per profile. If it is absent, the app falls back to the default single profile from `.env`.
+
+## Local Commands
+
+Pick a date:
 
 ```bash
-uv run send-me-research list-profiles
+TARGET_DATE="$(TZ=America/Los_Angeles date +%F)"
+```
+
+Load env:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+Preview:
+
+```bash
 uv run send-me-research preview-digest --date "$TARGET_DATE"
-uv run send-me-research preview-digest --date "$TARGET_DATE" --profile Security
+```
+
+Send:
+
+```bash
 uv run send-me-research run-digest --date "$TARGET_DATE" --send
 ```
 
-If `digest_profiles.json` is absent, the app falls back to the default single profile from `.env`.
+Preview one profile only:
 
-## Gmail
+```bash
+uv run send-me-research preview-digest --date "$TARGET_DATE" --profile Security
+```
 
-Use a Google app password, not your normal Gmail password.
+See resolved profiles:
 
-Required mail env:
+```bash
+uv run send-me-research list-profiles
+```
+
+Run tests:
+
+```bash
+uv run pytest -q
+```
+
+## Required Env
+
+Always required:
 
 - `EMAIL_FROM`
 - `SMTP_HOST`
@@ -112,18 +128,35 @@ Required mail env:
 - `SMTP_USERNAME`
 - `SMTP_PASSWORD`
 
-`EMAIL_TO` is only needed when you are not using profile config.
+Only required when you are not using profile config:
+
+- `EMAIL_TO`
+
+Common optional settings:
+
+- `DIGEST_TIMEZONE`
+- `CODEX_ENABLE_SEARCH`
+- `CODEX_ENABLE_WILDCARD_DISCOVERY`
+- `TOP_N`
+- `CODEX_SHORTLIST_SIZE`
+- `ROBOTICS_SPOTLIGHT_COUNT`
 
 ## GitHub Actions
 
 Two workflows are included:
 
-- `.github/workflows/daily-digest-hosted.yml`: GitHub-hosted runner using restored Codex auth
-- `.github/workflows/daily-digest.yml`: self-hosted runner using persistent `~/.codex`
+- `.github/workflows/daily-digest-hosted.yml`
+- `.github/workflows/daily-digest.yml`
 
-Hosted mode is the easiest path if you want a clean public repo and no daily commits.
+Hosted mode is the recommended setup if you want:
 
-Set these secrets:
+- a public repo
+- no daily commits for state
+- no always-on self-hosted runner
+
+### Hosted Setup
+
+Set these GitHub secrets:
 
 - `CODEX_AUTH_JSON_BASE64`
 - `CODEX_CONFIG_TOML_BASE64`
@@ -136,17 +169,22 @@ Set these secrets:
 - `DIGEST_PROFILES_JSON` optional
 - `OPENALEX_MAILTO` optional
 
-If `DIGEST_PROFILES_JSON` is set, the workflow uses that instead of a checked-in `digest_profiles.json`. That is the easiest way to keep recipient emails private in a public repo.
-
-Helper:
+Best path:
 
 ```bash
 ./scripts/sync_github_hosted_secrets.sh
 ```
 
-That script uploads Codex auth, mail secrets from `.env`, and `digest_profiles.json` if it exists.
+That script:
 
-## State
+- uploads your minimal Codex auth
+- uploads mail secrets from `.env`
+- uploads `digest_profiles.json` as `DIGEST_PROFILES_JSON` if the file exists
+- sets `DIGEST_AUTOMATION_MODE=hosted`
+
+If `DIGEST_PROFILES_JSON` is set, the workflow uses that instead of a checked-in `digest_profiles.json`. That is the cleanest way to keep recipient emails and audience configs private in a public repo.
+
+## State And Outputs
 
 The workflows do not commit state back to git. They restore the latest state artifact, use it for dedupe, prune it, and upload a fresh artifact after each run.
 
