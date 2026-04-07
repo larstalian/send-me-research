@@ -28,13 +28,15 @@ class Mailer:
         subject: str,
         html_body: str,
     ) -> None:
-        message = EmailMessage()
-        message["Subject"] = subject
-        message["From"] = self.sender
-        message["To"] = ", ".join(recipients)
-        message.set_content("This digest is best viewed in an HTML-capable email client.")
-        message.add_alternative(html_body, subtype="html")
-        self._send(message)
+        recipients = self._normalize_recipients(recipients)
+        for recipient in recipients:
+            message = EmailMessage()
+            message["Subject"] = subject
+            message["From"] = self.sender
+            message["To"] = recipient
+            message.set_content("This digest is best viewed in an HTML-capable email client.")
+            message.add_alternative(html_body, subtype="html")
+            self._send(message)
 
     def send_text(
         self,
@@ -43,14 +45,19 @@ class Mailer:
         subject: str,
         body: str,
     ) -> None:
-        message = EmailMessage()
-        message["Subject"] = subject
-        message["From"] = self.sender
-        message["To"] = ", ".join(recipients)
-        message.set_content(body)
-        self._send(message)
+        recipients = self._normalize_recipients(recipients)
+        for recipient in recipients:
+            message = EmailMessage()
+            message["Subject"] = subject
+            message["From"] = self.sender
+            message["To"] = recipient
+            message.set_content(body)
+            self._send(message)
 
     def _send(self, message: EmailMessage) -> None:
         with smtplib.SMTP_SSL(self.host, self.port) as smtp:
             smtp.login(self.username, self.password)
             smtp.send_message(message)
+
+    def _normalize_recipients(self, recipients: Iterable[str]) -> list[str]:
+        return [recipient.strip() for recipient in recipients if recipient and recipient.strip()]

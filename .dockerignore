@@ -1,4 +1,6 @@
 .git
+.env
+digest_profiles.json
 .venv
 __pycache__
 .pytest_cache
