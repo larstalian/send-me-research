@@ -22,15 +22,13 @@ with extra weight on post-training, fine-tuning, code generation, tool use, and 
 
 ## Example Output
 
-A checked-in sample digest lives at [`examples/digest-example/digest.html`](examples/digest-example/digest.html).
+Live example:
 
-GitHub does not render HTML files in the repo as live pages by default, so on GitHub you will mostly see the source. To view the example as intended:
+- [GitHub Pages sample digest](https://larstalian.github.io/send-me-research/)
 
-- open the file locally in a browser
-- or publish the `examples/` folder with GitHub Pages
-- or use any HTML preview service against the raw file URL once the repo is public
+The sample page is published automatically from this repo.
 
-To regenerate the sample example locally:
+To regenerate the example locally:
 
 ```bash
 uv run python scripts/render_example_digest.py
