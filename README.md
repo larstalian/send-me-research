@@ -1,22 +1,24 @@
 # Send Me Research
 
-Configurable Codex-backed daily paper digests.
+Configurable daily research digests powered by Codex.
 
-It pulls fresh papers from arXiv and OpenAlex, dedupes them, lets Codex rank the interesting ones, and sends a clean HTML email.
+This project watches fresh papers from arXiv and OpenAlex, dedupes them, lets Codex decide what is actually worth reading, and sends polished HTML email digests to one or more recipients.
 
-You can run it in two ways:
+It is built around a specific deployment trick: the hosted GitHub Actions workflow can reuse your existing Codex ChatGPT login by restoring a minimal `~/.codex` home from GitHub secrets. That means the ranking step can run in Actions without switching the project over to an OpenAI API key.
+
+You can run it in two modes:
 
 - one default digest from `.env`
 - multiple custom digests with different recipients and different research priorities
 
-The built-in default audience is:
+Out of the box, the default audience is:
 
 - LLMs
 - agents
 - robotics / embodied AI
 - cyber / AI security
 
-with extra weight on post-training, fine-tuning, code generation, tool use, and agentic-task improvement.
+with extra weight on post-training, fine-tuning, code generation, tool use, and agentic-task improvement. You can keep that default, or define completely different stacks per recipient.
 
 ## Setup
 
