@@ -32,7 +32,7 @@ def github_get_bytes(url: str, token: str) -> bytes:
     request = Request(
         url,
         headers={
-            "Accept": "application/octet-stream",
+            "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "User-Agent": "send-me-research",
             "X-GitHub-Api-Version": "2022-11-28",
