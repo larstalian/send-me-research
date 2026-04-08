@@ -7,11 +7,16 @@ import json
 import os
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 import zipfile
 
 
 STATE_FILES = {"papers_seen.jsonl", "digests_sent.jsonl"}
+
+
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def github_get_json(url: str, token: str) -> dict:
@@ -38,7 +43,25 @@ def github_get_bytes(url: str, token: str) -> bytes:
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    with urlopen(request) as response:
+    opener = build_opener(NoRedirectHandler())
+    try:
+        with opener.open(request) as response:
+            redirect_url = response.headers.get("Location")
+    except HTTPError as error:
+        if error.code not in {301, 302, 303, 307, 308}:
+            raise
+        redirect_url = error.headers.get("Location")
+
+    if not redirect_url:
+        raise RuntimeError(f"Artifact download endpoint returned no redirect location for {url}")
+
+    blob_request = Request(
+        redirect_url,
+        headers={
+            "User-Agent": "send-me-research",
+        },
+    )
+    with urlopen(blob_request) as response:
         return response.read()
 
 
