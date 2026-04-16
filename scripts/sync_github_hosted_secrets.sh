@@ -46,6 +46,11 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v codex >/dev/null 2>&1; then
+  echo "Missing codex CLI." >&2
+  exit 1
+fi
+
 if [[ ! -f "${AUTH_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
   echo "Missing Codex auth files. Run 'codex login' first." >&2
   exit 1
@@ -64,9 +69,67 @@ base64_encode() {
   fi
 }
 
+probe_codex_auth() {
+  python3 - <<'PY'
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+with tempfile.TemporaryDirectory(prefix="codex-auth-probe-") as temp_dir:
+    temp_path = Path(temp_dir)
+    schema_path = temp_path / "schema.json"
+    output_path = temp_path / "output.json"
+    schema_path.write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "properties": {"ok": {"type": "boolean"}},
+                "required": ["ok"],
+                "additionalProperties": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            "codex",
+            "exec",
+            "--skip-git-repo-check",
+            "--sandbox",
+            "read-only",
+            "--color",
+            "never",
+            "--ephemeral",
+            "--model",
+            "gpt-5.4",
+            "--output-schema",
+            str(schema_path),
+            "-o",
+            str(output_path),
+            "-",
+        ],
+        input="Return a JSON object with ok=true.",
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        sys.stderr.write(result.stderr.strip() or result.stdout.strip() or "Codex auth probe failed.\n")
+        raise SystemExit(1)
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    if payload.get("ok") is not True:
+        sys.stderr.write("Codex auth probe returned an unexpected payload.\n")
+        raise SystemExit(1)
+PY
+}
+
 set -a
 source "${ENV_FILE}"
 set +a
+
+probe_codex_auth
 
 gh secret set CODEX_AUTH_JSON_BASE64 --repo "${REPO}" < <(base64_encode "${AUTH_FILE}")
 gh secret set CODEX_CONFIG_TOML_BASE64 --repo "${REPO}" < <(base64_encode "${CONFIG_FILE}")
@@ -87,3 +150,4 @@ fi
 gh variable set DIGEST_AUTOMATION_MODE --repo "${REPO}" --body "hosted"
 
 echo "Synced hosted workflow secrets for ${REPO}."
+echo "If a hosted run later fails with a Codex auth error, run 'codex login' again and rerun this script."

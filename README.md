@@ -194,8 +194,11 @@ That script:
 - uploads mail secrets from `.env`
 - uploads `digest_profiles.json` as `DIGEST_PROFILES_JSON` if the file exists
 - sets `DIGEST_AUTOMATION_MODE=hosted`
+- refuses to sync if your local Codex session cannot pass a real `codex exec` probe
 
 If `DIGEST_PROFILES_JSON` is set, the workflow uses that instead of a checked-in `digest_profiles.json`. That is the cleanest way to keep recipient emails and audience configs private in a public repo.
+
+Hosted Codex auth is a snapshot, not a permanent token. If the workflow later fails with a Codex auth error, run `codex login` again locally and then rerun `./scripts/sync_github_hosted_secrets.sh`.
 
 ## State And Outputs
 

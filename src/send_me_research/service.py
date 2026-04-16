@@ -43,6 +43,8 @@ class DigestService:
         return self.run_digests(target_date=target_date, send=send, profile_name=profiles[0].name)[0]
 
     def run_digests(self, *, target_date: date, send: bool, profile_name: str | None = None) -> List[DigestRunResult]:
+        if send:
+            self.rank.auth_check()
         window = build_window(target_date, self.settings.timezone_name)
         base_candidates = self.collect_candidates(window)
         results: List[DigestRunResult] = []
@@ -300,7 +302,6 @@ class DigestService:
             self.settings.require_mail_settings()
             if not profile.recipients:
                 raise ValueError(f"Digest profile '{profile.name}' has no recipients configured.")
-            self.rank.auth_check()
             mailer = Mailer(
                 host=self.settings.smtp_host or "",
                 port=self.settings.smtp_port,

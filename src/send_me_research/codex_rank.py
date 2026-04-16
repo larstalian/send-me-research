@@ -23,6 +23,36 @@ class CodexAuthError(RuntimeError):
     pass
 
 
+AUTH_ERROR_PATTERNS = (
+    "failed to refresh token",
+    "refresh token was already used",
+    "provided authentication token is expired",
+    "authentication token is expired",
+    "401 unauthorized",
+    "please log out and sign in again",
+    "please try signing in again",
+)
+
+
+def _auth_recovery_message(details: str) -> str:
+    hint = (
+        "Codex auth is stale or expired. Run `codex login` locally. "
+        "If this is the hosted GitHub workflow, then re-run "
+        "`./scripts/sync_github_hosted_secrets.sh` to refresh the uploaded auth snapshot."
+    )
+    cleaned = details.strip()
+    if not cleaned:
+        return hint
+    return f"{cleaned}\n\n{hint}"
+
+
+def _maybe_auth_error(details: str) -> CodexAuthError | None:
+    normalized = details.lower()
+    if any(pattern in normalized for pattern in AUTH_ERROR_PATTERNS):
+        return CodexAuthError(_auth_recovery_message(details))
+    return None
+
+
 @dataclass
 class CodexRanker:
     codex_bin: str = "codex"
@@ -31,7 +61,7 @@ class CodexRanker:
     enable_search: bool = True
     runner: SchemaRunner = subprocess.run
 
-    def auth_check(self) -> str:
+    def auth_check(self, *, probe_exec: bool = True) -> str:
         result = self.runner(
             [self.codex_bin, "login", "status"],
             check=False,
@@ -40,8 +70,27 @@ class CodexRanker:
         )
         output = f"{result.stdout}\n{result.stderr}".strip()
         if result.returncode != 0 or "Logged in" not in output:
+            auth_error = _maybe_auth_error(output)
+            if auth_error:
+                raise auth_error
             raise CodexAuthError(output or "Codex login is not active.")
-        return output
+        if not probe_exec:
+            return output
+        schema = {
+            "type": "object",
+            "properties": {"ok": {"type": "boolean"}},
+            "required": ["ok"],
+            "additionalProperties": False,
+        }
+        payload = self._run_schema_prompt(
+            prompt="Return a JSON object with ok=true.",
+            schema=schema,
+            temp_prefix="codex-auth-probe-",
+            enable_search=False,
+        )
+        if payload.get("ok") is not True:
+            raise RuntimeError("Codex auth probe returned an unexpected payload.")
+        return f"{output}\nCodex exec probe succeeded."
 
     def rank(
         self,
@@ -350,14 +399,22 @@ class CodexRanker:
             )
         return "\n".join(lines)
 
-    def _run_schema_prompt(self, *, prompt: str, schema: Dict[str, object], temp_prefix: str) -> Dict[str, object]:
+    def _run_schema_prompt(
+        self,
+        *,
+        prompt: str,
+        schema: Dict[str, object],
+        temp_prefix: str,
+        enable_search: bool | None = None,
+    ) -> Dict[str, object]:
         with tempfile.TemporaryDirectory(prefix=temp_prefix) as temp_dir:
             temp_path = Path(temp_dir)
             schema_path = temp_path / "schema.json"
             output_path = temp_path / "output.json"
             schema_path.write_text(json.dumps(schema), encoding="utf-8")
             command = [self.codex_bin]
-            if self.enable_search:
+            use_search = self.enable_search if enable_search is None else enable_search
+            if use_search:
                 command.append("--search")
             command.extend(
                 [
@@ -387,7 +444,11 @@ class CodexRanker:
                 text=True,
             )
             if result.returncode != 0:
-                raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "Codex schema prompt failed.")
+                details = result.stderr.strip() or result.stdout.strip() or "Codex schema prompt failed."
+                auth_error = _maybe_auth_error(details)
+                if auth_error:
+                    raise auth_error
+                raise RuntimeError(details)
             return json.loads(output_path.read_text(encoding="utf-8"))
 
     def _enrich_selected_entries(self, entries: List[DigestEntry]) -> List[DigestEntry]:

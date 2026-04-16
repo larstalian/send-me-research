@@ -17,7 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Daily subscription-backed research digest.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    auth_check = subparsers.add_parser("auth-check", help="Verify Codex login state.")
+    auth_check = subparsers.add_parser("auth-check", help="Verify Codex login with a real exec probe.")
     auth_check.set_defaults(handler=handle_auth_check)
 
     profiles = subparsers.add_parser("list-profiles", help="Show resolved digest profiles.")

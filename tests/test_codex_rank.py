@@ -3,8 +3,10 @@ import subprocess
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from send_me_research.config import AppSettings
-from send_me_research.codex_rank import CodexRanker
+from send_me_research.codex_rank import CodexAuthError, CodexRanker
 from send_me_research.normalize import build_paper_record
 
 
@@ -13,9 +15,11 @@ def fake_runner(args, **kwargs):
         return subprocess.CompletedProcess(args, 0, stdout="Logged in using ChatGPT", stderr="")
 
     output_path = Path(args[args.index("-o") + 1])
-    assert "--search" in args
     input_text = kwargs.get("input", "")
-    if "Existing candidates to avoid duplicating:" in input_text:
+    if input_text == "Return a JSON object with ok=true.":
+        payload = {"ok": True}
+    elif "Existing candidates to avoid duplicating:" in input_text:
+        assert "--search" in args
         payload = {
             "summary": "Discovered one extra paper.",
             "discoveries": [
@@ -34,6 +38,7 @@ def fake_runner(args, **kwargs):
             ],
         }
     elif "You are enriching selected daily-digest papers with provenance context." in input_text:
+        assert "--search" in args
         payload = {
             "summary": "Enriched one entry.",
             "entries": [
@@ -46,6 +51,7 @@ def fake_runner(args, **kwargs):
             ],
         }
     else:
+        assert "--search" in args
         payload = {
             "summary": "Selected one entry.",
             "entries": [
@@ -107,6 +113,28 @@ def test_codex_ranker_uses_schema_output() -> None:
 def test_codex_auth_check() -> None:
     ranker = CodexRanker(runner=fake_runner)
     assert "Logged in using ChatGPT" in ranker.auth_check()
+
+
+def test_codex_schema_prompt_raises_auth_error_for_expired_token() -> None:
+    def expired_runner(args, **kwargs):
+        if args[1:3] == ["login", "status"]:
+            return subprocess.CompletedProcess(args, 0, stdout="Logged in using ChatGPT", stderr="")
+        return subprocess.CompletedProcess(
+            args,
+            1,
+            stdout="",
+            stderr=(
+                "Failed to refresh token: Your access token could not be refreshed because your "
+                "refresh token was already used. Please log out and sign in again."
+            ),
+        )
+
+    ranker = CodexRanker(runner=expired_runner)
+
+    with pytest.raises(CodexAuthError) as error:
+        ranker.auth_check()
+
+    assert "sync_github_hosted_secrets.sh" in str(error.value)
 
 
 def test_codex_wildcard_discovery_returns_records() -> None:

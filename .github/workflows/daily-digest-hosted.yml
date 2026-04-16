@@ -112,7 +112,7 @@ jobs:
           json.loads(Path.home().joinpath(".codex", "auth.json").read_text(encoding="utf-8"))
           PY
           chmod 600 "$HOME/.codex/auth.json" "$HOME/.codex/config.toml"
-          codex login status
+          echo "Restored Codex auth snapshot to \$HOME/.codex. A real exec probe runs inside the digest command."
 
       - name: Sync project
         if: env.SHOULD_RUN == 'true'
