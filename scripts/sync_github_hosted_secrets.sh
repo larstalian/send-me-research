@@ -6,7 +6,7 @@ detect_repo() {
   if ! git remote get-url origin >/dev/null 2>&1; then
     return 1
   fi
-  python - <<'PY'
+  python3 - <<'PY'
 from __future__ import annotations
 
 import re
