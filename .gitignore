@@ -4,6 +4,12 @@ digest_profiles.json
 out/
 state/*.jsonl
 .venv/
+.gh-cache/
+.gh-tmp/
+.uv-cache/
+.xdg-cache/
+tmp-out/
+tmp-state/
 .pytest_cache/
 __pycache__/
 *.pyc

@@ -292,6 +292,8 @@ class CodexRanker:
             "Also provide signal_score from 0 to 10 and a short signal_rationale that explains the external signal without over-weighting prestige.",
             "Use signal_score to capture things like strong institutions, serious real-world data, notable venue context, awards, or clear production relevance.",
             "Do not hallucinate awards, affiliations, or venue claims. If uncertain, say the provenance is unclear or that it is an arXiv preprint without evident award signal.",
+            "Be skeptical of self-published archive releases, especially Zenodo-, Figshare-, or OSF-style drops with no verified institution, venue, or real author footprint.",
+            "A topical but weakly validated self-published archive release should usually be dropped, and if kept at all it should rank well below papers with real external signal.",
             "Drop papers that are off-topic, weakly related, or obviously low-signal.",
             "You may use available web search to validate institutions, venue context, awards, or practical significance, but only select from the provided candidates.",
             "",

@@ -179,3 +179,95 @@ def test_build_shortlist_rescues_profile_fit_paper(tmp_path: Path) -> None:
     shortlist = service.build_shortlist(noisy_topical + [target], settings.default_profile())
 
     assert any(paper.canonical_id == "2604.01193v1" for paper in shortlist)
+
+
+def test_rank_entries_caps_low_confidence_archive_releases(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    settings = AppSettings.from_env(repo_root)
+    settings.state_dir = tmp_path / "state"
+    settings.output_dir = tmp_path / "out"
+    service = DigestService(settings)
+
+    strong = build_paper_record(
+        title="Serious Post-Training Paper",
+        abstract="A strong fine-tuning and code generation paper from a known lab.",
+        authors=["Known Author"],
+        published_at=datetime(2026, 4, 20, tzinfo=timezone.utc),
+        source="arXiv",
+        landing_url="https://arxiv.org/abs/2604.12345",
+        pdf_url=None,
+        doi=None,
+        source_ids=["strong"],
+        extras=["cs.CL"],
+        canonical_id="strong",
+    )
+    weak_archive_one = build_paper_record(
+        title="Unknown Zenodo Release One",
+        abstract="A topical but weakly validated code generation release.",
+        authors=["Unknown"],
+        published_at=datetime(2026, 4, 20, tzinfo=timezone.utc),
+        source="OpenAlex",
+        landing_url="https://doi.org/10.5281/zenodo.11111111",
+        pdf_url=None,
+        doi="https://doi.org/10.5281/zenodo.11111111",
+        source_ids=["weak-1"],
+        extras=["cs.CL"],
+        canonical_id="weak-1",
+    )
+    weak_archive_two = build_paper_record(
+        title="Unknown Zenodo Release Two",
+        abstract="Another topical but weakly validated code generation release.",
+        authors=["Unknown"],
+        published_at=datetime(2026, 4, 20, tzinfo=timezone.utc),
+        source="OpenAlex",
+        landing_url="https://doi.org/10.5281/zenodo.22222222",
+        pdf_url=None,
+        doi="https://doi.org/10.5281/zenodo.22222222",
+        source_ids=["weak-2"],
+        extras=["cs.CL"],
+        canonical_id="weak-2",
+    )
+
+    class Ranker:
+        def rank(self, *, candidates, target_date, timezone_name, top_n, audience_profile):
+            return [
+                DigestEntry(
+                    paper=weak_archive_one,
+                    section="LLMs",
+                    rank_score=92.0,
+                    why_it_matters="Topical but weakly validated.",
+                    provenance="This appears to be a Zenodo self-published release by an unknown author, and I did not verify an institutional affiliation or peer-reviewed venue for it.",
+                    signal_score=2.0,
+                    signal_rationale="The provenance signal is limited to archival hosting on Zenodo without stronger external confirmation.",
+                ),
+                DigestEntry(
+                    paper=strong,
+                    section="LLMs",
+                    rank_score=89.0,
+                    why_it_matters="Strong and well grounded.",
+                    provenance="Known lab authorship with clear institutional footprint.",
+                    signal_score=7.0,
+                    signal_rationale="Clear identifiable authorship and stronger external signal.",
+                ),
+                DigestEntry(
+                    paper=weak_archive_two,
+                    section="LLMs",
+                    rank_score=88.0,
+                    why_it_matters="Also topical but weakly validated.",
+                    provenance="This appears to be a Zenodo self-published release by an unknown author, and I did not verify an institutional affiliation or peer-reviewed venue for it.",
+                    signal_score=1.0,
+                    signal_rationale="Only archival hosting on Zenodo was found.",
+                ),
+            ]
+
+    service.rank = Ranker()
+
+    entries = service.rank_entries(
+        [strong, weak_archive_one, weak_archive_two],
+        target_date=date(2026, 4, 20),
+        profile=settings.default_profile(),
+    )
+
+    assert entries[0].paper.canonical_id == "strong"
+    kept_ids = [entry.paper.canonical_id for entry in entries]
+    assert kept_ids.count("weak-1") + kept_ids.count("weak-2") == 1

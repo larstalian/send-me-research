@@ -15,6 +15,22 @@ from .render import DigestRenderer, build_subject
 from .sources import SourceClient
 from .state import StateStore
 
+LOW_CONFIDENCE_ARCHIVE_MARKERS = (
+    "10.5281/zenodo.",
+    "zenodo.org",
+    "figshare.",
+    "osf.io",
+    "dryad.",
+)
+LOW_CONFIDENCE_ARCHIVE_PROVENANCE_MARKERS = (
+    "self-published",
+    "did not verify",
+    "no independently verified",
+    "no strong independent provenance",
+)
+LOW_CONFIDENCE_ARCHIVE_SIGNAL_MAX = 3.0
+LOW_CONFIDENCE_ARCHIVE_KEEP_LIMIT = 1
+
 
 class DigestService:
     def __init__(self, settings: AppSettings) -> None:
@@ -179,8 +195,7 @@ class DigestService:
             top_n=profile.top_n,
             audience_profile=profile,
         )
-        entries.sort(key=lambda item: (section_sort_key(item.section), -item.rank_score, item.paper.title))
-        return entries
+        return self._finalize_ranked_entries(entries, top_n=profile.top_n)
 
     def build_shortlist(self, candidates: List[PaperRecord], profile: AudienceProfile) -> List[PaperRecord]:
         ranked = sorted(
@@ -352,6 +367,42 @@ class DigestService:
             if normalized in title:
                 bonus += 0.6
         return paper.screening_score + min(bonus, 12.0)
+
+    def _finalize_ranked_entries(self, entries: List[DigestEntry], *, top_n: int) -> List[DigestEntry]:
+        normal_entries: List[DigestEntry] = []
+        low_confidence_archives: List[DigestEntry] = []
+        for entry in entries:
+            if self._is_low_confidence_archive_entry(entry):
+                low_confidence_archives.append(entry)
+            else:
+                normal_entries.append(entry)
+
+        sort_key = lambda item: (section_sort_key(item.section), -item.rank_score, -item.signal_score, item.paper.title)
+        normal_entries.sort(key=sort_key)
+        low_confidence_archives.sort(key=sort_key)
+
+        if normal_entries:
+            low_confidence_archives = low_confidence_archives[:LOW_CONFIDENCE_ARCHIVE_KEEP_LIMIT]
+
+        return (normal_entries + low_confidence_archives)[:top_n]
+
+    def _is_low_confidence_archive_entry(self, entry: DigestEntry) -> bool:
+        text = " ".join(
+            part
+            for part in (
+                entry.paper.doi or "",
+                entry.paper.landing_url,
+                entry.provenance,
+                entry.signal_rationale,
+            )
+            if part
+        ).lower()
+        has_archive_marker = any(marker in text for marker in LOW_CONFIDENCE_ARCHIVE_MARKERS)
+        if not has_archive_marker:
+            return False
+        has_low_signal = entry.signal_score <= LOW_CONFIDENCE_ARCHIVE_SIGNAL_MAX
+        has_weak_provenance = any(marker in text for marker in LOW_CONFIDENCE_ARCHIVE_PROVENANCE_MARKERS)
+        return has_low_signal or has_weak_provenance
 
     def _subject_for_profile(self, profile: AudienceProfile, digest_date: str, count: int) -> str:
         subject = build_subject(digest_date, count)
