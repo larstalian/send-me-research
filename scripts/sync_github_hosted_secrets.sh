@@ -141,6 +141,10 @@ for key in EMAIL_TO EMAIL_FROM SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD O
   fi
 done
 
+if [[ -n "${CODEX_SECRET_SYNC_TOKEN:-}" ]]; then
+  gh secret set CODEX_SECRET_SYNC_TOKEN --repo "${REPO}" < <(printf '%s' "${CODEX_SECRET_SYNC_TOKEN}")
+fi
+
 if [[ -n "${DIGEST_PROFILES_JSON:-}" ]]; then
   gh secret set DIGEST_PROFILES_JSON --repo "${REPO}" < <(printf '%s' "${DIGEST_PROFILES_JSON}")
 elif [[ -f "${PROFILES_FILE}" ]]; then
@@ -150,4 +154,5 @@ fi
 gh variable set DIGEST_AUTOMATION_MODE --repo "${REPO}" --body "hosted"
 
 echo "Synced hosted workflow secrets for ${REPO}."
-echo "If a hosted run later fails with a Codex auth error, run 'codex login' again and rerun this script."
+echo "For persistent hosted Codex auth, also set CODEX_SECRET_SYNC_TOKEN to a repo-scoped token that can update Actions secrets."
+echo "If hosted auth is already stale, run 'codex login' again and rerun this script."

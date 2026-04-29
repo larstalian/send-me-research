@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional
 from urllib.parse import quote_plus
 
@@ -41,6 +42,20 @@ OPENALEX_QUERIES = [
     "prompt injection",
     "red teaming llm",
 ]
+ARXIV_PAGE_SIZE = 500
+
+
+def format_arxiv_submitted_date(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y%m%d%H%M")
+
+
+def build_arxiv_search_query(start_token: str, end_token: str, categories: Iterable[str]) -> str:
+    clean_categories = [category.strip() for category in categories if category.strip()]
+    date_query = f"submittedDate:[{start_token} TO {end_token}]"
+    if not clean_categories:
+        return quote_plus(date_query)
+    category_query = " OR ".join(f"cat:{category}" for category in clean_categories)
+    return quote_plus(f"({category_query}) AND {date_query}")
 
 
 @dataclass
@@ -94,65 +109,78 @@ class SourceClient:
                 last_error = error
         raise SourceError(str(last_error) if last_error else f"Failed request for {url}")
 
-    def fetch_arxiv(self, window: DateWindow, max_results: int = 250) -> List[PaperRecord]:
-        start_token = window.start_at.astimezone().strftime("%Y%m%d0000")
-        end_token = window.end_at.astimezone().strftime("%Y%m%d2359")
-        query = quote_plus(f"submittedDate:[{start_token} TO {end_token}]")
-        url = (
-            "https://export.arxiv.org/api/query"
-            f"?search_query={query}&start=0&max_results={max_results}"
-            "&sortBy=submittedDate&sortOrder=descending"
-        )
-        try:
-            response = self._get(url)
-        except SourceError:
-            return []
-        root = ET.fromstring(response.text)
+    def fetch_arxiv(
+        self,
+        window: DateWindow,
+        max_results: int = 2000,
+        categories: Iterable[str] = (),
+    ) -> List[PaperRecord]:
+        start_token = format_arxiv_submitted_date(window.start_at)
+        end_token = format_arxiv_submitted_date(window.end_at)
+        query = build_arxiv_search_query(start_token, end_token, categories)
 
         papers: List[PaperRecord] = []
-        for entry in root.findall("atom:entry", ARXIV_NAMESPACE):
-            title = entry.findtext("atom:title", default="", namespaces=ARXIV_NAMESPACE)
-            summary = entry.findtext("atom:summary", default="", namespaces=ARXIV_NAMESPACE)
-            updated = entry.findtext("atom:updated", default="", namespaces=ARXIV_NAMESPACE)
-            link = ""
-            pdf_url = None
-            source_ids: List[str] = []
-            categories: List[str] = []
-
-            identifier = entry.findtext("atom:id", default="", namespaces=ARXIV_NAMESPACE)
-            if identifier:
-                source_ids.append(identifier.rsplit("/", 1)[-1])
-
-            for link_el in entry.findall("atom:link", ARXIV_NAMESPACE):
-                href = link_el.attrib.get("href", "")
-                if link_el.attrib.get("rel") == "alternate":
-                    link = href
-                if link_el.attrib.get("title") == "pdf":
-                    pdf_url = href
-            for category in entry.findall("atom:category", ARXIV_NAMESPACE):
-                term = category.attrib.get("term")
-                if term:
-                    categories.append(term)
-
-            authors = [author.findtext("atom:name", default="", namespaces=ARXIV_NAMESPACE) for author in entry.findall("atom:author", ARXIV_NAMESPACE)]
-            if not title or not updated or not link:
-                continue
-            published_at = normalize_arxiv_timestamp(updated)
-            papers.append(
-                build_paper_record(
-                    title=title,
-                    abstract=summary,
-                    authors=authors,
-                    published_at=published_at,
-                    source="arXiv",
-                    landing_url=link,
-                    pdf_url=pdf_url,
-                    doi=None,
-                    source_ids=source_ids,
-                    extras=categories,
-                    canonical_id=(source_ids[0] if source_ids else None),
-                )
+        for start in range(0, max(max_results, 0), ARXIV_PAGE_SIZE):
+            page_size = min(ARXIV_PAGE_SIZE, max_results - start)
+            url = (
+                "https://export.arxiv.org/api/query"
+                f"?search_query={query}&start={start}&max_results={page_size}"
+                "&sortBy=submittedDate&sortOrder=descending"
             )
+            try:
+                response = self._get(url)
+            except SourceError:
+                return papers
+            root = ET.fromstring(response.text)
+            entries = root.findall("atom:entry", ARXIV_NAMESPACE)
+            if not entries:
+                break
+
+            for entry in entries:
+                title = entry.findtext("atom:title", default="", namespaces=ARXIV_NAMESPACE)
+                summary = entry.findtext("atom:summary", default="", namespaces=ARXIV_NAMESPACE)
+                updated = entry.findtext("atom:updated", default="", namespaces=ARXIV_NAMESPACE)
+                link = ""
+                pdf_url = None
+                source_ids: List[str] = []
+                categories: List[str] = []
+
+                identifier = entry.findtext("atom:id", default="", namespaces=ARXIV_NAMESPACE)
+                if identifier:
+                    source_ids.append(identifier.rsplit("/", 1)[-1])
+
+                for link_el in entry.findall("atom:link", ARXIV_NAMESPACE):
+                    href = link_el.attrib.get("href", "")
+                    if link_el.attrib.get("rel") == "alternate":
+                        link = href
+                    if link_el.attrib.get("title") == "pdf":
+                        pdf_url = href
+                for category in entry.findall("atom:category", ARXIV_NAMESPACE):
+                    term = category.attrib.get("term")
+                    if term:
+                        categories.append(term)
+
+                authors = [author.findtext("atom:name", default="", namespaces=ARXIV_NAMESPACE) for author in entry.findall("atom:author", ARXIV_NAMESPACE)]
+                if not title or not updated or not link:
+                    continue
+                published_at = normalize_arxiv_timestamp(updated)
+                papers.append(
+                    build_paper_record(
+                        title=title,
+                        abstract=summary,
+                        authors=authors,
+                        published_at=published_at,
+                        source="arXiv",
+                        landing_url=link,
+                        pdf_url=pdf_url,
+                        doi=None,
+                        source_ids=source_ids,
+                        extras=categories,
+                        canonical_id=(source_ids[0] if source_ids else None),
+                    )
+                )
+            if len(entries) < page_size:
+                break
         return papers
 
     def fetch_openalex(self, window: DateWindow, per_page: int = 100, max_pages: int = 2) -> List[PaperRecord]:

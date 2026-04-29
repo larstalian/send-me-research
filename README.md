@@ -152,6 +152,8 @@ Common optional settings:
 - `CODEX_ENABLE_WILDCARD_DISCOVERY`
 - `TOP_N`
 - `CODEX_SHORTLIST_SIZE`
+- `ARXIV_MAX_RESULTS`
+- `ARXIV_CATEGORIES`
 - `ROBOTICS_SPOTLIGHT_COUNT`
 
 ## GitHub Actions
@@ -173,6 +175,7 @@ Set these GitHub secrets:
 
 - `CODEX_AUTH_JSON_BASE64`
 - `CODEX_CONFIG_TOML_BASE64`
+- `CODEX_SECRET_SYNC_TOKEN` optional but recommended, lets hosted runs persist refreshed Codex auth back to GitHub Secrets
 - `EMAIL_FROM`
 - `SMTP_HOST`
 - `SMTP_PORT`
@@ -198,7 +201,9 @@ That script:
 
 If `DIGEST_PROFILES_JSON` is set, the workflow uses that instead of a checked-in `digest_profiles.json`. That is the cleanest way to keep recipient emails and audience configs private in a public repo.
 
-Hosted Codex auth is a snapshot, not a permanent token. If the workflow later fails with a Codex auth error, run `codex login` again locally and then rerun `./scripts/sync_github_hosted_secrets.sh`.
+Hosted Codex auth is a rotating snapshot. If hosted auth is already stale, run `codex login` again locally and then rerun `./scripts/sync_github_hosted_secrets.sh`.
+
+For persistent hosted auth, create a repo-scoped GitHub token that can update Actions secrets and store it as `CODEX_SECRET_SYNC_TOKEN`. After each successful hosted run, the workflow writes the refreshed `~/.codex/auth.json` back to `CODEX_AUTH_JSON_BASE64`, so the next run does not reuse an already-rotated refresh token. If that refresh step fails, the digest can still finish, but the next run may need a manual auth re-sync.
 
 ## State And Outputs
 

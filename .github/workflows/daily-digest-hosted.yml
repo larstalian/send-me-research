@@ -149,6 +149,14 @@ jobs:
             uv run send-me-research preview-digest --date "$TARGET_DATE"
           fi
 
+      - name: Refresh hosted Codex auth secrets
+        if: success() && env.SHOULD_RUN == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CODEX_SECRET_SYNC_TOKEN }}
+        run: bash scripts/refresh_github_codex_auth_secret.sh
+
       - name: Prune state window
         if: success() && env.SHOULD_RUN == 'true'
         shell: bash

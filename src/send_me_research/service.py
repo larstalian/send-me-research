@@ -124,7 +124,11 @@ class DigestService:
         )
 
     def collect_candidates(self, window) -> List[PaperRecord]:
-        records = self.source_client.fetch_arxiv(window, max_results=self.settings.arxiv_max_results)
+        records = self.source_client.fetch_arxiv(
+            window,
+            max_results=self.settings.arxiv_max_results,
+            categories=self.settings.arxiv_categories,
+        )
         records.extend(
             self.source_client.fetch_openalex(
                 window,

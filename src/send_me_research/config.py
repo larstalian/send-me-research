@@ -24,6 +24,21 @@ DEFAULT_PRIORITY_KEYWORDS = [
     "prompt injection",
     "robotics",
 ]
+DEFAULT_ARXIV_CATEGORIES = [
+    "cs.CL",
+    "cs.AI",
+    "cs.LG",
+    "cs.CR",
+    "cs.RO",
+    "cs.CV",
+    "cs.SE",
+    "cs.MA",
+    "cs.IR",
+    "cs.HC",
+    "stat.ML",
+    "eess.SY",
+    "eess.IV",
+]
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -130,7 +145,8 @@ class AppSettings:
     shortlist_per_profile: int = 10
     robotics_spotlight_count: int = 2
     robotics_min_heuristic_score: float = 2.5
-    arxiv_max_results: int = 250
+    arxiv_max_results: int = 2000
+    arxiv_categories: list[str] = field(default_factory=lambda: list(DEFAULT_ARXIV_CATEGORIES))
     openalex_per_page: int = 100
     openalex_max_pages: int = 2
 
@@ -173,7 +189,8 @@ class AppSettings:
             shortlist_per_profile=int(os.getenv("SHORTLIST_PER_PROFILE", "10")),
             robotics_spotlight_count=int(os.getenv("ROBOTICS_SPOTLIGHT_COUNT", "2")),
             robotics_min_heuristic_score=float(os.getenv("ROBOTICS_MIN_HEURISTIC_SCORE", "2.5")),
-            arxiv_max_results=int(os.getenv("ARXIV_MAX_RESULTS", "250")),
+            arxiv_max_results=int(os.getenv("ARXIV_MAX_RESULTS", "2000")),
+            arxiv_categories=env_csv("ARXIV_CATEGORIES", DEFAULT_ARXIV_CATEGORIES),
             openalex_per_page=int(os.getenv("OPENALEX_PER_PAGE", "100")),
             openalex_max_pages=int(os.getenv("OPENALEX_MAX_PAGES", "2")),
         )

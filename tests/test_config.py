@@ -70,3 +70,10 @@ def test_default_profile_fallback_uses_env_email(tmp_path: Path, monkeypatch) ->
 
     assert profile.recipients == ["one@example.com", "two@example.com"]
     assert "post-training" in profile.description
+
+
+def test_arxiv_categories_can_be_configured_from_env(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("ARXIV_CATEGORIES", "cs.CL, stat.ML")
+    settings = AppSettings.from_env(tmp_path)
+
+    assert settings.arxiv_categories == ["cs.CL", "stat.ML"]

@@ -8,7 +8,7 @@ from send_me_research.service import DigestService
 
 
 class FakeSourceClient:
-    def fetch_arxiv(self, window, max_results=250):
+    def fetch_arxiv(self, window, max_results=250, categories=()):
         return [
             build_paper_record(
                 title="Agentic Security for LLM Systems",
