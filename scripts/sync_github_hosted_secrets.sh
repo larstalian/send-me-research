@@ -30,11 +30,17 @@ PY
 }
 
 REPO="${1:-$(detect_repo || true)}"
-CODEX_DIR="${HOME}/.codex"
-AUTH_FILE="${CODEX_DIR}/auth.json"
-CONFIG_FILE="${CODEX_DIR}/config.toml"
 ENV_FILE="${2:-.env}"
 PROFILES_FILE="${3:-digest_profiles.json}"
+LOCAL_CODEX_CONFIG="${HOME}/.codex/config.toml"
+BOOTSTRAP_CODEX_HOME="$(mktemp -d "${TMPDIR:-/tmp}/send-me-research-codex-home.XXXXXX")"
+AUTH_FILE="${BOOTSTRAP_CODEX_HOME}/auth.json"
+CONFIG_FILE="${BOOTSTRAP_CODEX_HOME}/config.toml"
+
+cleanup() {
+  rm -rf "${BOOTSTRAP_CODEX_HOME}"
+}
+trap cleanup EXIT
 
 if [[ -z "${REPO}" ]]; then
   echo "Missing owner/repo. Pass it explicitly or set a GitHub origin remote first." >&2
@@ -48,11 +54,6 @@ fi
 
 if ! command -v codex >/dev/null 2>&1; then
   echo "Missing codex CLI." >&2
-  exit 1
-fi
-
-if [[ ! -f "${AUTH_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
-  echo "Missing Codex auth files. Run 'codex login' first." >&2
   exit 1
 fi
 
@@ -129,10 +130,30 @@ set -a
 source "${ENV_FILE}"
 set +a
 
-probe_codex_auth
+if [[ -n "${CODEX_SECRET_SYNC_TOKEN:-}" ]]; then
+  export GH_TOKEN="${CODEX_SECRET_SYNC_TOKEN}"
+elif ! gh secret list --repo "${REPO}" | awk '{print $1}' | grep -qx CODEX_SECRET_SYNC_TOKEN; then
+  echo "Missing CODEX_SECRET_SYNC_TOKEN. Set it in ${ENV_FILE} or as a GitHub Actions secret." >&2
+  exit 1
+fi
+
+mkdir -p "${BOOTSTRAP_CODEX_HOME}"
+if [[ -f "${LOCAL_CODEX_CONFIG}" ]]; then
+  cp "${LOCAL_CODEX_CONFIG}" "${CONFIG_FILE}"
+else
+  : > "${CONFIG_FILE}"
+fi
+
+echo "Starting a fresh hosted-only Codex login. This does not use your normal ~/.codex/auth.json."
+CODEX_HOME="${BOOTSTRAP_CODEX_HOME}" codex login --device-auth
+
+CODEX_HOME="${BOOTSTRAP_CODEX_HOME}" probe_codex_auth
 
 gh secret set CODEX_AUTH_JSON_BASE64 --repo "${REPO}" < <(base64_encode "${AUTH_FILE}")
 gh secret set CODEX_CONFIG_TOML_BASE64 --repo "${REPO}" < <(base64_encode "${CONFIG_FILE}")
+if [[ -n "${CODEX_SECRET_SYNC_TOKEN:-}" ]]; then
+  gh secret set CODEX_SECRET_SYNC_TOKEN --repo "${REPO}" < <(printf '%s' "${CODEX_SECRET_SYNC_TOKEN}")
+fi
 
 for key in EMAIL_TO EMAIL_FROM SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD OPENALEX_MAILTO; do
   value="${!key-}"
@@ -140,10 +161,6 @@ for key in EMAIL_TO EMAIL_FROM SMTP_HOST SMTP_PORT SMTP_USERNAME SMTP_PASSWORD O
     gh secret set "${key}" --repo "${REPO}" < <(printf '%s' "${value}")
   fi
 done
-
-if [[ -n "${CODEX_SECRET_SYNC_TOKEN:-}" ]]; then
-  gh secret set CODEX_SECRET_SYNC_TOKEN --repo "${REPO}" < <(printf '%s' "${CODEX_SECRET_SYNC_TOKEN}")
-fi
 
 if [[ -n "${DIGEST_PROFILES_JSON:-}" ]]; then
   gh secret set DIGEST_PROFILES_JSON --repo "${REPO}" < <(printf '%s' "${DIGEST_PROFILES_JSON}")
@@ -154,5 +171,4 @@ fi
 gh variable set DIGEST_AUTOMATION_MODE --repo "${REPO}" --body "hosted"
 
 echo "Synced hosted workflow secrets for ${REPO}."
-echo "For persistent hosted Codex auth, also set CODEX_SECRET_SYNC_TOKEN to a repo-scoped token that can update Actions secrets."
-echo "If hosted auth is already stale, run 'codex login' again and rerun this script."
+echo "Hosted Codex auth was bootstrapped from a fresh CODEX_HOME and the local copy was discarded."

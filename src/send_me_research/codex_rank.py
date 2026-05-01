@@ -36,9 +36,9 @@ AUTH_ERROR_PATTERNS = (
 
 def _auth_recovery_message(details: str) -> str:
     hint = (
-        "Codex auth is stale or expired. Run `codex login` locally. "
-        "If this is the hosted GitHub workflow, then re-run "
-        "`./scripts/sync_github_hosted_secrets.sh` to refresh the uploaded auth snapshot."
+        "Codex auth is stale or expired. If this is the hosted GitHub workflow, re-run "
+        "`./scripts/sync_github_hosted_secrets.sh` to create a fresh hosted-only login. "
+        "Do not upload your normal ~/.codex/auth.json."
     )
     cleaned = details.strip()
     if not cleaned:

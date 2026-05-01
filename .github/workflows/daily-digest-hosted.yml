@@ -89,14 +89,20 @@ jobs:
         run: npm install -g @openai/codex
 
       - name: Restore minimal Codex auth
+        id: restore_codex_auth
         if: env.SHOULD_RUN == 'true'
         shell: bash
         env:
           CODEX_AUTH_JSON_BASE64: ${{ secrets.CODEX_AUTH_JSON_BASE64 }}
           CODEX_CONFIG_TOML_BASE64: ${{ secrets.CODEX_CONFIG_TOML_BASE64 }}
+          CODEX_SECRET_SYNC_TOKEN: ${{ secrets.CODEX_SECRET_SYNC_TOKEN }}
         run: |
           if [[ -z "${CODEX_AUTH_JSON_BASE64:-}" || -z "${CODEX_CONFIG_TOML_BASE64:-}" ]]; then
             echo "Missing hosted Codex auth secrets. Run scripts/sync_github_hosted_secrets.sh or set CODEX_AUTH_JSON_BASE64 and CODEX_CONFIG_TOML_BASE64." >&2
+            exit 1
+          fi
+          if [[ -z "${CODEX_SECRET_SYNC_TOKEN:-}" ]]; then
+            echo "Missing CODEX_SECRET_SYNC_TOKEN. Hosted Codex auth must be written back after every run." >&2
             exit 1
           fi
           mkdir -p "$HOME/.codex"
@@ -131,6 +137,7 @@ jobs:
             --state-dir state
 
       - name: Build preview or send digest
+        id: digest_run
         if: env.SHOULD_RUN == 'true'
         shell: bash
         env:
@@ -150,20 +157,19 @@ jobs:
           fi
 
       - name: Refresh hosted Codex auth secrets
-        if: success() && env.SHOULD_RUN == 'true'
-        continue-on-error: true
+        if: always() && env.SHOULD_RUN == 'true' && steps.restore_codex_auth.outcome == 'success'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.CODEX_SECRET_SYNC_TOKEN }}
         run: bash scripts/refresh_github_codex_auth_secret.sh
 
       - name: Prune state window
-        if: success() && env.SHOULD_RUN == 'true'
+        if: always() && env.SHOULD_RUN == 'true' && steps.digest_run.outcome == 'success'
         shell: bash
         run: uv run send-me-research prune-state --days "$STATE_RETENTION_DAYS"
 
       - name: Upload state artifact
-        if: success() && env.SHOULD_RUN == 'true'
+        if: always() && env.SHOULD_RUN == 'true' && steps.digest_run.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.STATE_ARTIFACT_NAME }}
@@ -172,7 +178,7 @@ jobs:
           retention-days: 90
 
       - name: Upload digest artifact
-        if: success() && env.SHOULD_RUN == 'true'
+        if: always() && env.SHOULD_RUN == 'true' && steps.digest_run.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: digest-${{ env.TARGET_DATE }}-hosted

@@ -7,8 +7,8 @@ AUTH_FILE="${CODEX_AUTH_FILE:-${HOME}/.codex/auth.json}"
 CONFIG_FILE="${CODEX_CONFIG_FILE:-${HOME}/.codex/config.toml}"
 
 if [[ -z "${GH_TOKEN:-}" ]]; then
-  echo "Skipping Codex auth secret refresh because GH_TOKEN is not set."
-  exit 0
+  echo "Missing GH_TOKEN. Refusing to finish after consuming hosted Codex auth." >&2
+  exit 1
 fi
 
 if [[ -z "${REPO}" ]]; then

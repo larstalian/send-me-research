@@ -4,7 +4,7 @@ Configurable daily research digests powered by Codex.
 
 This project automatically watches fresh papers from arXiv and OpenAlex every day, dedupes them, lets Codex decide what is actually worth reading, and sends polished HTML email digests to one or more recipients.
 
-It is built around a specific deployment trick: the hosted GitHub Actions workflow can reuse your existing Codex ChatGPT login by restoring a minimal `~/.codex` home from GitHub secrets. That means the ranking step can run in Actions without switching the project over to an OpenAI API key.
+The hosted GitHub Actions workflow uses a dedicated Codex ChatGPT login. Do not upload your normal `~/.codex/auth.json`: Codex refresh tokens are single-use, so sharing one token family between your laptop and GitHub-hosted runners will eventually invalidate one side.
 
 A live sample digest is published at [larstalian.github.io/send-me-research](https://larstalian.github.io/send-me-research/).
 
@@ -175,7 +175,7 @@ Set these GitHub secrets:
 
 - `CODEX_AUTH_JSON_BASE64`
 - `CODEX_CONFIG_TOML_BASE64`
-- `CODEX_SECRET_SYNC_TOKEN` optional but recommended, lets hosted runs persist refreshed Codex auth back to GitHub Secrets
+- `CODEX_SECRET_SYNC_TOKEN`, required so hosted runs can persist refreshed Codex auth back to GitHub Secrets
 - `EMAIL_FROM`
 - `SMTP_HOST`
 - `SMTP_PORT`
@@ -193,17 +193,17 @@ Best path:
 
 That script:
 
-- uploads your minimal Codex auth
+- starts a fresh hosted-only Codex device login
+- uploads that temporary Codex auth
+- deletes the local temporary auth copy
 - uploads mail secrets from `.env`
 - uploads `digest_profiles.json` as `DIGEST_PROFILES_JSON` if the file exists
 - sets `DIGEST_AUTOMATION_MODE=hosted`
-- refuses to sync if your local Codex session cannot pass a real `codex exec` probe
+- refuses to sync if the hosted-only Codex login cannot pass a real `codex exec` probe
 
 If `DIGEST_PROFILES_JSON` is set, the workflow uses that instead of a checked-in `digest_profiles.json`. That is the cleanest way to keep recipient emails and audience configs private in a public repo.
 
-Hosted Codex auth is a rotating snapshot. If hosted auth is already stale, run `codex login` again locally and then rerun `./scripts/sync_github_hosted_secrets.sh`.
-
-For persistent hosted auth, create a repo-scoped GitHub token that can update Actions secrets and store it as `CODEX_SECRET_SYNC_TOKEN`. After each successful hosted run, the workflow writes the refreshed `~/.codex/auth.json` back to `CODEX_AUTH_JSON_BASE64`, so the next run does not reuse an already-rotated refresh token. If that refresh step fails, the digest can still finish, but the next run may need a manual auth re-sync.
+Create a repo-scoped GitHub token that can update Actions secrets and put it in `.env` as `CODEX_SECRET_SYNC_TOKEN` before running the sync script. The workflow refuses to consume Codex auth unless that token is present, and it writes the refreshed `~/.codex/auth.json` back after every Codex attempt, including failed digest runs.
 
 ## State And Outputs
 
