@@ -42,6 +42,7 @@ class DigestService:
             model=self.settings.codex_model,
             reasoning_effort=self.settings.codex_reasoning_effort,
             enable_search=self.settings.codex_enable_search,
+            timeout_seconds=self.settings.codex_timeout_seconds,
         )
         self.renderer = DigestRenderer(self.settings.workspace_root / "templates")
         self.source_client = SourceClient(contact_email=self.settings.contact_email)

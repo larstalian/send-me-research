@@ -59,6 +59,7 @@ class CodexRanker:
     model: str = "gpt-5.4"
     reasoning_effort: str = "medium"
     enable_search: bool = True
+    timeout_seconds: int = 900
     runner: SchemaRunner = subprocess.run
 
     def auth_check(self, *, probe_exec: bool = True) -> str:
@@ -438,13 +439,17 @@ class CodexRanker:
                     "-",
                 ]
             )
-            result = self.runner(
-                command,
-                input=prompt,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            try:
+                result = self.runner(
+                    command,
+                    input=prompt,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout_seconds,
+                )
+            except subprocess.TimeoutExpired as error:
+                raise RuntimeError(f"Codex schema prompt timed out after {self.timeout_seconds} seconds.") from error
             if result.returncode != 0:
                 details = result.stderr.strip() or result.stdout.strip() or "Codex schema prompt failed."
                 auth_error = _maybe_auth_error(details)

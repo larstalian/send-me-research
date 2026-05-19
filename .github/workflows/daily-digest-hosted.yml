@@ -52,7 +52,8 @@ jobs:
             if [[ "$AUTOMATION_MODE" != "hosted" ]]; then
               SHOULD_RUN=false
             fi
-            LOCAL_HOUR="$(TZ=America/Los_Angeles date +%H)"
+            SCHEDULE_UTC_HOUR="$(awk '{print $2}' <<< "${{ github.event.schedule }}")"
+            LOCAL_HOUR="$(TZ=America/Los_Angeles date -d "${TARGET_DATE} ${SCHEDULE_UTC_HOUR}:00 UTC" +%H)"
             if [[ "$LOCAL_HOUR" != "08" ]]; then
               SHOULD_RUN=false
             fi

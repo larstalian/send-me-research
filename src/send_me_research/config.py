@@ -128,6 +128,7 @@ class AppSettings:
     codex_model: str = "gpt-5.4"
     codex_reasoning_effort: str = "medium"
     codex_enable_search: bool = True
+    codex_timeout_seconds: int = 900
     codex_enable_wildcard_discovery: bool = True
     codex_wildcard_candidates: int = 8
     state_dir: Path = Path("state")
@@ -172,6 +173,7 @@ class AppSettings:
             codex_model=os.getenv("CODEX_MODEL", "gpt-5.4"),
             codex_reasoning_effort=os.getenv("CODEX_REASONING_EFFORT", "medium"),
             codex_enable_search=env_bool("CODEX_ENABLE_SEARCH", True),
+            codex_timeout_seconds=int(os.getenv("CODEX_TIMEOUT_SECONDS", "900")),
             codex_enable_wildcard_discovery=env_bool("CODEX_ENABLE_WILDCARD_DISCOVERY", True),
             codex_wildcard_candidates=int(os.getenv("CODEX_WILDCARD_CANDIDATES", "8")),
             state_dir=state_dir,
